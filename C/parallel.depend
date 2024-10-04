@@ -1,0 +1,14 @@
+# depslib dependency file v1.0
+1728032029 source:d:\hpc\parallel\main.c
+	<stdio.h>
+	<immintrin.h>
+	<time.h>
+	<string.h>
+	<simd.h>
+
+1728027775 source:d:\hpc\parallel\avx2.c
+
+1728028058 d:\hpc\parallel\simd.h
+
+1728032021 d:\hpc\parallel\\simd.h
+

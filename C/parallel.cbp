@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="parallel" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/parallel" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-mavx2" />
+					<Add option='-I&quot;${OCL_ROOT}\include&quot;' />
+					<Add option='-I&quot;${OCL_ROOT}\lib\x64&quot;' />
+					<Add directory="$(PROJECT_DIR)" />
+					<Add directory="D:/hpc/parallel/" />
+					<Add directory="." />
+				</Compiler>
+				<Linker>
+					<Add option="-O2" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/parallel" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-mavx2" />
+					<Add option='-I&quot;${OCL_ROOT}\include&quot;' />
+					<Add option='-I&quot;${OCL_ROOT}\lib\x64&quot;' />
+				</Compiler>
+				<Linker>
+					<Add option="-O2" />
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="avx2.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="simd.h" />
+		<Extensions />
+	</Project>
+</CodeBlocks_project_file>
