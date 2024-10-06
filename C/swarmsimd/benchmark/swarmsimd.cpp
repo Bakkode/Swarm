@@ -9,71 +9,179 @@
 
 int main(void)
 {
+    // Define X, Y, Z
+    int max = 5000000;
 
-    SimdVector* vectorPtr = createVectorFp32256(4, 40, 0.4);
+    clock_t initStart = clock();
+    SimdVector* constThree = createScalarFp32256(3);
+    SimdVector* constFour = createScalarFp32256(4);
+    SimdVector* constFive = createScalarFp32256(5);
+    SimdVector* constSix = createScalarFp32256(6);
+    SimdVector* constSeven = createScalarFp32256(7);
+    SimdVector* constEight = createScalarFp32256(8);
 
-    clock_t start = clock();
-    for (int i = 0; i < 1000000; i++) {
-        int ii = i * 10;
+    SimdVector* constPi = createScalarFp32256(3.14159);
+    SimdVector* constE = createScalarFp32256(2.71828);
 
-        appendFp32256(vectorPtr, ii + 0, ii + 1, ii + 2, ii + 3, ii + 4, ii + 5, ii + 6, ii + 7);
+    SimdVector* vectorX = createVectorFp32256(4, 500, 0.3f);
+    for (int i = 1; i <= max; i++) {
+        float ii = (float)(1000.0 / (double)i);
+
+        appendFp32256(vectorX, ii, ii + 1.0f, ii + 2.0f, ii + 3.0f, ii + 4.0f, ii + 5.0f, ii + 6.0f, ii + 7.0f);
     }
 
-    SimdVector* scalar1Ptr = createScalarFp32256(8);
-    SimdVector* scalar2Ptr = createScalarFp32256(2);
+    printf("\n~Initialization~ of %i data. Elapsed time: %f seconds", max, (double)(clock() - initStart) / CLOCKS_PER_SEC);
 
-    // Print the result
-    double time = (double)(clock() - start) / CLOCKS_PER_SEC;
-    printf("Elapsed time: %f seconds for %i insertion. Showing first 45 data", time, 7000000);
+    printf("\n\n==== === ====\n\n");
 
+    clock_t initComputation = clock();
 
-   /* for (int i = 0; i < 45; i++) {
-        if (i % 8 == 0) {
-            printf("\nValue is:");
+    // (((3 * x * y) - (5 * x) + (7 * y)) / ((4 * x) - (6 * y)) + (((e * x) - (pi * y) + 8) / 3)
+
+    //(x * y)
+    for (int loop = 0; loop < 100; loop++) {
+        SimdVector* group3XY = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulVectorFp32256(group3XY, 0, vectorX, vectorX); // *
         }
 
-        printf("%f, ", getFp32256(vectorPtr, i));
-    }
-
-    printf("\n-----------\n");*/
-
-
-
-    clock_t start2 = clock();
-
-
-
-    SimdVector* scalar3 = deriveVectorFp32256(scalar1Ptr);
-    addScalarFp32256(scalar3, scalar1Ptr, scalar2Ptr);
-
-    SimdVector* vector5Ptr = deriveVectorFp32256(vectorPtr);
-    for (int i = 0; i <= vectorPtr->threadIndex.totalThreads; i++) {
-        addVectorFp32256(vector5Ptr, i, vectorPtr, vectorPtr);
-    }
-
-    SimdVector* result = deriveVectorFp32256(vector5Ptr);
-    for (int i = 0; i <= vector5Ptr->threadIndex.totalThreads; i++) {
-        addMixedFp32256(result, i, vector5Ptr, scalar3);
-    }
-
-    printf("\nElapsed time: %f seconds for addition. Showing first 45 data", (double)(clock() - start2) / CLOCKS_PER_SEC);
-
-    float values[8];
-    __m256 simd = ((__m256*)(scalar3->threadList[0]))[0];
-    _mm256_storeu_ps(values, simd);
-
-    /*for (int i = 0; i < 45; i++) {
-        if (i % 8 == 0) {
-            printf("\nValue is:");
+        // (3 * x * y)
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(group3XY, i, group3XY, constThree); // *
         }
 
-        printf("%f, ", getFp32256(result, i));
-    }*/
+        // (5 * x)
+        SimdVector* group5x = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(group5x, i, vectorX, constFive); // *
+        }
 
-    destroyFp32256(vectorPtr);
+        // (7 * y)
+        SimdVector* group7y = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(group7y, i, vectorX, constSeven); // *
+        }
 
-    int num;
-    scanf("%d", &num);
+        // - (5 * x)
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            subVectorFp32256(group3XY, i, group3XY, group5x); // -
+        }
+
+        // + (7 * y)
+        //This
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            addVectorFp32256(group3XY, i, group3XY, group7y); // +
+        }
+
+        // All Above is ok
+        // 
+        //((4 * x) - (6 * y)) + (((e * x) - (pi * y) + 8) / 3)
+
+        // (6 * y)
+        SimdVector* group6y = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(group6y, i, vectorX, constSix);
+        }
+
+        // (4 * x)
+        SimdVector* group4x = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(group4x, i, vectorX, constFour);
+        }
+
+        // This
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            subVectorFp32256(group4x, i, group4x, group6y);
+        }
+
+        SimdVector* groupEx = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(groupEx, i, vectorX, constE);
+        }
+
+        SimdVector* groupPIy = deriveVectorFp32256(vectorX);
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            mulMixedFp32256(groupPIy, i, vectorX, constPi);
+        }
+
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            subVectorFp32256(groupEx, i, groupEx, groupPIy);
+        }
+
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            addMixedFp32256(groupEx, i, groupEx, constEight);
+        }
+
+        // This
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            divMixedFp32256(groupEx, i, groupEx, constThree);
+        }
+
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            addVectorFp32256(group4x, i, group4x, groupEx);
+        }
+
+        for (int i = 0; i <= vectorX->threadIndex.totalThreads; i++) {
+            divVectorFp32256(vectorX, i, group3XY, group4x);
+        }
+
+        destroyFp32256(groupPIy);
+        destroyFp32256(groupEx);
+        destroyFp32256(group4x);
+        destroyFp32256(group6y);
+        destroyFp32256(group7y);
+        destroyFp32256(group5x);
+        destroyFp32256(group3XY);
+    }
+
+    printf("\n~SIMD Computation~ Elapsed time: %f seconds", (double)(clock() - initComputation) / CLOCKS_PER_SEC);
+    
+    printf("\nq: %f", getFp32256(vectorX, 0));
+    printf("\nq: %f", getFp32256(vectorX, 1));
+    printf("\nq: %f", getFp32256(vectorX, 2));
+    printf("\nq: %f", getFp32256(vectorX, 3));
+    
+    printf("\n==== vs ====");
+
+    clock_t linComputation = clock();
+
+    for (int i = 1; i <= max; i++) {
+        float ii = (float)(1000.0 / (double)i);
+
+        for (float f = 0.0; f < 8.0; f += 1.0) {
+
+            for (int loop = 0; loop < 10000; loop++) {
+                float num = ii + f;
+
+                float group3XY = num * num * 3;
+                float group5x = num * 5;
+                float group7y = num * 7;
+
+                group3XY -= group5x;
+                group3XY += group7y;
+
+                float group6y = num * 6;
+                float group4x = num * 4;
+
+                group4x -= group6y;
+
+                float groupEx = num * 2.71828;
+                float groupPIy = num * 3.14159;
+
+                groupEx -= groupPIy;
+                groupEx += 8;
+
+                groupEx /= 3;
+
+                group4x += groupEx;
+
+                num = group3XY / group4x;
+            }            
+        }
+    }
+
+    printf("\n~Linear Computation~ Elapsed time: %f seconds\n\n\n", (double)(clock() - linComputation) / CLOCKS_PER_SEC);
+
     return 0;
 }
 

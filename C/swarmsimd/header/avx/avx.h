@@ -2,7 +2,7 @@
 #define AVX_H_INCLUDED
 
 #include "arthmavx.h"
-#include "trfrmavx.h"
+#include "trnfravx.h"
 
 
 #endif // AVX_H_INCLUDED

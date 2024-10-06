@@ -7,8 +7,8 @@
 *   Can indexing up to 2^32 threads
 */
 typedef struct {
-    unsigned int totalThreads; // Maximum thread possible (must be power of 2)
-    unsigned int counter; // Cyclic thread index
+    int totalThreads; // Maximum thread possible (must be power of 2)
+    int counter; // Cyclic thread index
 } ThreadIndexer;
 
 /**
@@ -19,11 +19,11 @@ typedef struct {
 typedef struct {
     ThreadIndexer threadIndex;
 
-    int    chunkSize;
+    long long int    chunkSize;
     float  incFactor;
 
     void** threadList;
-    int* indexCtr;
+    long long int* indexCtr;
 } SimdVector;
 
 #endif // VECTOR_H_INCLUDED
