@@ -1,5 +1,8 @@
 #include "../vector.h"
 
+#ifndef TRNFRAVX_H_INCLUDED
+#define TRNFRAVX_H_INCLUDED
+
 #ifndef DllExport
 #ifdef _WIN32
 #define DllExport __declspec( dllexport )
@@ -7,9 +10,6 @@
 #define DllExport __attribute__((visibility("default")))
 #endif
 #endif //DllExport
-
-#ifndef TRNFRAVX_H_INCLUDED
-#define TRNFRAVX_H_INCLUDED
 
 DllExport SimdVector* createScalarFp32256(float value);
 

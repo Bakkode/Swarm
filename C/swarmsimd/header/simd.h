@@ -5,5 +5,6 @@
 #include <intrin.h>
 
 #include "avx/avx.h"
+#include "thread.h"
 
 #endif // SIMD_H_INCLUDED

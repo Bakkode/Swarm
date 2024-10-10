@@ -4,8 +4,6 @@ extern "C" {
 #include <immintrin.h>
 #include <intrin.h>
 
-static unsigned int ONE = 1;
-
 static inline int cycle(ThreadIndexer* cc) {
     cc->counter = (cc->counter + 1) & cc->totalThreads;
     return cc->counter;

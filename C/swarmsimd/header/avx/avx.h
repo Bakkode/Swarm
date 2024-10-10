@@ -4,5 +4,4 @@
 #include "arthmavx.h"
 #include "trnfravx.h"
 
-
 #endif // AVX_H_INCLUDED
