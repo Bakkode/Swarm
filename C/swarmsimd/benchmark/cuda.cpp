@@ -1,22 +1,82 @@
 ﻿#include <cuda_runtime.h>
 #include <cuda.h>
+#include <nvrtc.h>
+
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
-// Function to read PTX code from a file
-std::string readPTXFile(const std::string& filename) {
-    std::ifstream file(filename);
+void checkCudaError(CUresult result, const char* msg) {
+    if (result == CUDA_SUCCESS) {
+        return;
+    }
+
+    const char* errorStr;
+    cuGetErrorString(result, &errorStr);
+    std::cerr << msg << " - CUDA error: " << errorStr << std::endl;
+    exit(EXIT_FAILURE);
+}
+
+void checkNvrtcError(nvrtcResult result, const char* msg) {
+    if (result == NVRTC_SUCCESS) {
+        return;
+    }
+
+    std::cerr << msg << " - NVRTC error: " << nvrtcGetErrorString(result) << std::endl;
+    exit(EXIT_FAILURE);
+}
+
+string readFromFile(const string& filename) {
+    ifstream file(filename);
+
     if (!file.is_open()) {
         std::cerr << "Failed to open PTX file: " << filename << std::endl;
         exit(EXIT_FAILURE);
     }
-    std::string ptxCode((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
     file.close();
-    return ptxCode;
+    return content;
 }
+
+CUmodule loadFromPtx(const char* ptxSource) {
+    CUmodule module;
+    cuModuleLoadData(&module, ptxSource);
+
+    return module;
+}
+
+CUmodule loadFromCuSrc(const char* cudaSource) {
+    nvrtcProgram prog;
+    checkNvrtcError(nvrtcCreateProgram(&prog, cudaSource, "cuda.cu", 0, nullptr, nullptr), "Program creation failed");
+
+    nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, nullptr);
+    if (compileResult != NVRTC_SUCCESS) {
+        size_t logSize;
+        nvrtcGetProgramLogSize(prog, &logSize);
+        vector<char> log(logSize);
+        nvrtcGetProgramLog(prog, log.data());
+        cerr << "Compilation failed with error log:\n" << log.data() << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // Obtain PTX code
+    size_t ptxSize;
+    checkNvrtcError(nvrtcGetPTXSize(prog, &ptxSize), "Failed to get PTX size");
+
+    vector<char> ptx(ptxSize);
+    checkNvrtcError(nvrtcGetPTX(prog, ptx.data()), "Failed to get PTX");
+
+    // Cleanup NVRTC program
+    nvrtcDestroyProgram(&prog);
+
+    return loadFromPtx(ptx.data());
+}
+
+
 
 void printCudaDevices() {
     int deviceCount;
@@ -46,7 +106,12 @@ void printCudaDevices() {
     }
 }
 
-int main() {
+
+void launch() {
+
+}
+
+int _main() {
     printCudaDevices();
 
     // Initialize CUDA
@@ -78,12 +143,21 @@ int main() {
     cuMemcpyHtoD(d_b, b, n * sizeof(int));
     cuMemcpyHtoD(d_n, d, sizeof(int));
 
-    // Read PTX code from file
-    std::string ptxCode = readPTXFile("C:\\wsl\\Programming\\swarmcu.ptx");
-
     // Load PTX code and get kernel function
-    CUmodule module;
-    cuModuleLoadData(&module, ptxCode.c_str());
+   
+    const char* cudaSource = R"(
+        extern "C" __global__ void addKernel(int *a, int *b, int *c, int *n) {
+            int i = blockIdx.x * blockDim.x + threadIdx.x;
+            if (i < *n) {
+                c[i] = a[i] + b[i] + 5;
+            }
+        }
+        )";
+
+    cout << "bububaba" << endl;
+    CUmodule module = loadFromPtx(readFromFile("C:\\wsl\\Programming\\swarmcu.ptx").c_str());
+    //CUmodule module = loadFromCuSrc(cudaSource);
+
     CUfunction addKernel;
     cuModuleGetFunction(&addKernel, module, "addKernel");
 

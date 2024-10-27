@@ -23,6 +23,7 @@ file(GLOB_RECURSE LIB_FILES "${LIB_DIR}/*.lib" "${LIB_DIR}/*.a" "${LIB_DIR}/*.so
 
 # Find CUDA package (not always necessary, but can be useful)
 find_package(CUDA REQUIRED)
+find_package(OpenCL)
 
 # Include directories
 include_directories(${CUDA_INCLUDE_DIRS})
