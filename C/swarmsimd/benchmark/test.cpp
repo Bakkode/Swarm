@@ -9,7 +9,7 @@ extern "C" {
 #include "../header/avx/avx.h"
 #include <immintrin.h>
 
-    int main(void)
+    int mainaa(void)
     {
         // Define X, Y, Z
         int max = 5000000;
