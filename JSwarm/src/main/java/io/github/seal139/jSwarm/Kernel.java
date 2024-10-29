@@ -50,8 +50,8 @@ public abstract class Kernel {
 	protected abstract PType sub (Number v1, Number v2);
 	
 	//Logical
-	protected abstract PType equals		(PType v1, PType v2);
-	protected abstract PType notEquals	(PType v1, PType v2);
+	protected abstract Int32 equals		(PType v1, PType v2);
+	protected abstract Int32 notEquals	(PType v1, PType v2);
 	protected abstract PType and		(PType v1, PType v2);
 	protected abstract PType nand		(PType v1, PType v2);
 	protected abstract PType or			(PType v1, PType v2);
@@ -60,8 +60,8 @@ public abstract class Kernel {
 	protected abstract PType nxor		(PType v1, PType v2);
 	protected abstract PType not		(PType v);
 	
-	protected abstract PType equals		(PType v1, Number v2);
-	protected abstract PType notEquals	(PType v1, Number v2);
+	protected abstract Int32 equals		(PType v1, Number v2);
+	protected abstract Int32 notEquals	(PType v1, Number v2);
 	protected abstract PType and		(PType v1, Number v2);
 	protected abstract PType nand		(PType v1, Number v2);
 	protected abstract PType or			(PType v1, Number v2);
@@ -70,8 +70,8 @@ public abstract class Kernel {
 	protected abstract PType nxor		(PType v1, Number v2);
 	protected abstract PType not		(Number v);
 	
-	protected abstract PType equals		(Number v1, PType v2);
-	protected abstract PType notEquals	(Number v1, PType v2);
+	protected abstract Int32 equals		(Number v1, PType v2);
+	protected abstract Int32 notEquals	(Number v1, PType v2);
 	protected abstract PType and		(Number v1, PType v2);
 	protected abstract PType nand		(Number v1, PType v2);
 	protected abstract PType or			(Number v1, PType v2);
@@ -79,8 +79,8 @@ public abstract class Kernel {
 	protected abstract PType xor		(Number v1, PType v2);
 	protected abstract PType nxor		(Number v1, PType v2);
 	
-	protected abstract PType equals		(Number v1, Number v2);
-	protected abstract PType notEquals	(Number v1, Number v2);
+	protected abstract Int32 equals		(Number v1, Number v2);
+	protected abstract Int32 notEquals	(Number v1, Number v2);
 	protected abstract PType and		(Number v1, Number v2);
 	protected abstract PType nand		(Number v1, Number v2);
 	protected abstract PType or			(Number v1, Number v2);
@@ -88,25 +88,25 @@ public abstract class Kernel {
 	protected abstract PType xor		(Number v1, Number v2);
 	protected abstract PType nxor		(Number v1, Number v2);
 	
-	protected abstract PType lessThan				(PType v1, PType v2);
-	protected abstract PType lessThanOrEquals		(PType v1, PType v2);
-	protected abstract PType greaterThan			(PType v1, PType v2);
-	protected abstract PType greaterThanOrEquals	(PType v1, PType v2);
+	protected abstract Int32 lessThan				(PType v1, PType v2);
+	protected abstract Int32 lessThanOrEquals		(PType v1, PType v2);
+	protected abstract Int32 greaterThan			(PType v1, PType v2);
+	protected abstract Int32 greaterThanOrEquals	(PType v1, PType v2);
 	
-	protected abstract PType lessThan				(Number v1, PType v2);
-	protected abstract PType lessThanOrEquals		(Number v1, PType v2);
-	protected abstract PType greaterThan			(Number v1, PType v2);
-	protected abstract PType greaterThanOrEquals	(Number v1, PType v2);
+	protected abstract Int32 lessThan				(Number v1, PType v2);
+	protected abstract Int32 lessThanOrEquals		(Number v1, PType v2);
+	protected abstract Int32 greaterThan			(Number v1, PType v2);
+	protected abstract Int32 greaterThanOrEquals	(Number v1, PType v2);
 	
-	protected abstract PType lessThan				(PType v1, Number v2);
-	protected abstract PType lessThanOrEquals		(PType v1, Number v2);
-	protected abstract PType greaterThan			(PType v1, Number v2);
-	protected abstract PType greaterThanOrEquals	(PType v1, Number v2);
+	protected abstract Int32 lessThan				(PType v1, Number v2);
+	protected abstract Int32 lessThanOrEquals		(PType v1, Number v2);
+	protected abstract Int32 greaterThan			(PType v1, Number v2);
+	protected abstract Int32 greaterThanOrEquals	(PType v1, Number v2);
 	
-	protected abstract PType lessThan				(Number v1, Number v2);
-	protected abstract PType lessThanOrEquals		(Number v1, Number v2);
-	protected abstract PType greaterThan			(Number v1, Number v2);
-	protected abstract PType greaterThanOrEquals	(Number v1, Number v2);
+	protected abstract Int32 lessThan				(Number v1, Number v2);
+	protected abstract Int32 lessThanOrEquals		(Number v1, Number v2);
+	protected abstract Int32 greaterThan			(Number v1, Number v2);
+	protected abstract Int32 greaterThanOrEquals	(Number v1, Number v2);
 	
 	// Array
 	protected abstract PType initArray(PType size);

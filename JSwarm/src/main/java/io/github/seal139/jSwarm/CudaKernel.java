@@ -168,304 +168,258 @@ public class CudaKernel extends Kernel {
 		return new PType(getType(v1, v2), "((" + v1.toString() + ") - (" + v2.toString() + "))");
 	}
 
+	// ======================
+	
 	@Override
-	protected PType equals(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 equals(PType v1, PType v2) {
+		return Int32.ofExpression("((" + v1.forStatement() + ") == (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType notEquals(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 notEquals(PType v1, PType v2) {
+		return Int32.ofExpression("((" + v1.forStatement() + ") != (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType and(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") & (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nand(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") & (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType or(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") | (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nor(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") | (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType xor(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") ^ (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nxor(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") ^ (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType not(PType v) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(v.getType(), "!(" + v.forStatement() + ")");
 	}
 
 	@Override
-	protected PType equals(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 equals(PType v1, Number v2) {
+		return Int32.ofExpression("((" + v1.forStatement() + ") == (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType notEquals(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 notEquals(PType v1, Number v2) {
+		return Int32.ofExpression("((" + v1.forStatement() + ") != (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType and(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") & (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nand(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") & (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType or(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") | (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nor(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") | (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType xor(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "((" + v1.forStatement() + ") ^ (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nxor(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v1, v2), "!((" + v1.forStatement() + ") ^ (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType not(Number v) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(extractType(v), "!(" + v.toString() + ")");
 	}
 
 	@Override
-	protected PType equals(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 equals(Number v1, PType v2) {
+		return Int32.ofExpression("((" + v1.toString() + ") == (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType notEquals(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 notEquals(Number v1, PType v2) {
+		return Int32.ofExpression("((" + v1.toString() + ") != (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType and(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") & (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nand(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") & (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType or(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") | (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nor(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") | (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType xor(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") ^ (" + v2.forStatement() + "))");
 	}
 
 	@Override
 	protected PType nxor(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") ^ (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType equals(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 equals(Number v1, Number v2) {
+		return Int32.ofExpression("((" + v1.toString() + ") == (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType notEquals(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 notEquals(Number v1, Number v2) {
+		return Int32.ofExpression("((" + v1.toString() + ") != (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType and(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") & (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nand(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") & (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType or(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") | (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nor(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") | (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType xor(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "((" + v1.toString() + ") ^ (" + v2.toString() + "))");
 	}
 
 	@Override
 	protected PType nxor(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+		return new PType(getType(v2, v1), "!((" + v1.toString() + ") ^ (" + v2.toString() + "))");
+	}
+
+	// =====================
+	
+	@Override
+	protected Int32 lessThan(PType v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") < (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType lessThan(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThanOrEquals(PType v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") <= (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType lessThanOrEquals(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThan(PType v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") > (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType greaterThan(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThanOrEquals(PType v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") >= (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType greaterThanOrEquals(PType v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThan(Number v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") < (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType lessThan(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThanOrEquals(Number v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") <= (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType lessThanOrEquals(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThan(Number v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") > (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType greaterThan(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThanOrEquals(Number v1, PType v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") >= (" + v2.forStatement() + "))");
 	}
 
 	@Override
-	protected PType greaterThanOrEquals(Number v1, PType v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThan(PType v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") < (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType lessThan(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThanOrEquals(PType v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") <= (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType lessThanOrEquals(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThan(PType v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") > (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType greaterThan(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThanOrEquals(PType v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.forStatement() + ") >= (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType greaterThanOrEquals(PType v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThan(Number v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") < (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType lessThan(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 lessThanOrEquals(Number v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") <= (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType lessThanOrEquals(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThan(Number v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") > (" + v2.toString() + "))");
 	}
 
 	@Override
-	protected PType greaterThan(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	protected PType greaterThanOrEquals(Number v1, Number v2) {
-		// TODO Auto-generated method stub
-		return null;
+	protected Int32 greaterThanOrEquals(Number v1, Number v2) {
+		return Int32.ofExpression("!((" + v1.toString() + ") >= (" + v2.toString() + "))");
 	}
 
 	@Override
