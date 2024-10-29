@@ -93,16 +93,52 @@ void printCudaDevices() {
         cudaDeviceProp deviceProp;
         cudaGetDeviceProperties(&deviceProp, i);
 
-        cout << "Device " << i << ": " << deviceProp.name << std::endl;
-        std::cout << "  Total global memory: " << deviceProp.totalGlobalMem << " bytes" << std::endl;
-        std::cout << "  Multiprocessor count: " << deviceProp.multiProcessorCount << std::endl;
-        std::cout << "  Max threads per block: " << deviceProp.maxThreadsPerBlock << std::endl;
-        std::cout << "  Max grid size: ["
+        cout << "Device Name" << i << ": " << deviceProp.name << std::endl;
+        std::cout << "  Compute Units: " << deviceProp.multiProcessorCount << std::endl;
+        std::cout << "  Global Memory Size: " << deviceProp.totalGlobalMem << std::endl;
+        
+        std::cout << "  Max Work Group Sizes: " << deviceProp.maxThreadsPerBlock << std::endl;
+        std::cout << "  Max Work Item Size: ["
             << deviceProp.maxGridSize[0] << ", "
             << deviceProp.maxGridSize[1] << ", "
             << deviceProp.maxGridSize[2] << "]" << std::endl;
+
+        deviceProp.warpSize;
+
         std::cout << "  Compute capability: " << deviceProp.major << "." << deviceProp.minor << std::endl;
-        std::cout << std::endl;
+        std::cout << std::endl;      
+
+        int coresPerSM;
+        int cudaCores;
+        int instructionsPerCycle = 2; // Typically 2 FLOPS per cycle for FP32 on NVIDIA GPUs
+
+        // Determine cores per Streaming Multiprocessor (SM) based on architecture
+        if (deviceProp.major == 8) {  // Ampere
+            coresPerSM = 128;
+        }
+        else if (deviceProp.major == 7) {  // Volta and Turing
+            coresPerSM = (deviceProp.minor == 5) ? 64 : 128;
+        }
+        else if (deviceProp.major == 6) {  // Pascal
+            coresPerSM = 64;
+        }
+        else if (deviceProp.major == 5) {  // Maxwell
+            coresPerSM = 128;
+        }
+        else if (deviceProp.major == 3) {  // Kepler
+            coresPerSM = 192;
+        }
+        else {
+            coresPerSM = 0;
+        }
+
+        // Calculate total CUDA cores
+        cudaCores = deviceProp.multiProcessorCount * coresPerSM;
+
+        // Peak FLOPS = CUDA cores * Clock Frequency (in GHz) * Instructions per Cycle
+        double peakFLOPS = cudaCores * (deviceProp.clockRate * 1e3) * instructionsPerCycle;
+
+        std::cout << "Estimated Peak FLOPS: " << peakFLOPS / 1e12 << " TFLOPS" << std::endl;
     }
 }
 
@@ -111,7 +147,7 @@ void launch() {
 
 }
 
-int _main() {
+int main() {
     printCudaDevices();
 
     // Initialize CUDA
