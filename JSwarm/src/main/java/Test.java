@@ -2,6 +2,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
+
+import io.github.seal139.jSwarm.core.Decompiler;
+import io.github.seal139.jSwarm.runtime.ExampleKernel;
+import io.github.seal139.jSwarm.runtime.FooKernel;
 
 public class Test {	
 	public static void boo() {
@@ -29,10 +34,31 @@ public class Test {
     }
 	
 	
-	public static void main (String ...strings ) {
-		boo();
-	       		
-		String classPath = "/" + Expl.class.getName().replace('.', '/') + ".class";
+	public static void main (String ...strings ) throws Exception {
+		Test t = new Test();
+		
+		t.decompile();
+	}
+	
+	public void decompile() throws Exception {
+		String classPath = "/" + ExampleKernel.class.getName().replace('.', '/') + ".class";
+		
+		
+		Decompiler d = Decompiler.getDefault();
+		
+		String s1 = d.process(List.of(ExampleKernel.class), this::processCuda);
+		String s2 = d.process(List.of(FooKernel.class), this::processCuda);
+		String s3 = d.process(List.of(ExampleKernel.class, FooKernel.class), this::processCuda);
+
+		
+		System.out.println();
+		
+		System.out.println(s1);
+		System.out.println("\n\n\n============\n\n\n");
+		System.out.println(s2);
+		System.out.println("\n\n\n============\n\n\n");
+		System.out.println(s3);
+		
 		
         
         try (InputStream input = Test.class.getResourceAsStream(classPath)) {
@@ -51,6 +77,10 @@ public class Test {
         } catch (Exception e) {
             e.printStackTrace();
         }
+	}
+	
+	public String processCuda(String s) {
+		return s + "vvv";
 	}
 	
 	

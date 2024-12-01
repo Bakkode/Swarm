@@ -1,6 +1,5 @@
 import io.github.seal139.jSwarm.hardware.Hardware;
 import io.github.seal139.jSwarm.hardware.HardwareInfo;
-import io.github.seal139.jSwarm.runtime.datatype.NumberVector;
 
 public class Hpc {	
 
@@ -20,7 +19,6 @@ public class Hpc {
 	}
 	
 	public static void main(String[] args) {
-		NumberVector<Integer> nv = new NumberVector<>();
 		
 		Hardware hw = Hardware.getInstance();
 		
