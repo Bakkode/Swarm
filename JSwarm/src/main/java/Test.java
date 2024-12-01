@@ -2,11 +2,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
 import java.util.List;
 
 import io.github.seal139.jSwarm.core.Decompiler;
 import io.github.seal139.jSwarm.runtime.ExampleKernel;
 import io.github.seal139.jSwarm.runtime.FooKernel;
+import io.github.seal139.jSwarm.wrapper.Swarm;
 
 public class Test {	
 	public static void boo() {
@@ -35,6 +37,8 @@ public class Test {
 	
 	
 	public static void main (String ...strings ) throws Exception {
+		System.out.println(Swarm.isDebug());
+		
 		Test t = new Test();
 		
 		t.decompile();
@@ -80,7 +84,7 @@ public class Test {
 	}
 	
 	public String processCuda(String s) {
-		return s + "vvv";
+		return s;
 	}
 	
 	

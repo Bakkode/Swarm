@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.runtime;
+package io.github.seal139.jSwarm.wrapper;
 
 import java.util.ArrayList;
 import java.util.List;
