@@ -7,13 +7,6 @@
 
 using namespace std;
 
-// OpenCL kernel as a string
-
-
-
-
-
-
 intptr_t* getDevice(int platformIndex, int deviceIndex) {
     intptr_t* ret = new intptr_t[2];
 
@@ -90,7 +83,7 @@ intptr_t* createKernel(intptr_t program, const char* kernelName) {
     ret[0] = (intptr_t)errorCode;
     ret[1] = (intptr_t)kernel;
 
-    *kernel = clCreateKernel(*((cl_program*)program), "vecAdd", NULL);
+    *kernel = clCreateKernel(*((cl_program*)program), kernelName, NULL);
 
     return ret;
 }
@@ -121,31 +114,47 @@ void wait(intptr_t queues) {
     clFinish(queue[3]);
 }
 
-intptr_t copyData(intptr_t context, intptr_t kernel, int paramIndex, intptr_t dataSource, size_t dataSize, intptr_t queue, int queueIndex) {
-    cl_mem* buffer = new cl_mem;
+intptr_t copyData(  intptr_t context, 
+                    intptr_t dataSource, size_t dataSize, size_t dataCount,
+                    intptr_t queue, int queueIndex) {
 
-    *buffer = clCreateBuffer(*((cl_context*)context), CL_MEM_READ_WRITE, sizeof(float) * dataSize, NULL, NULL);
-    clEnqueueWriteBuffer(((cl_command_queue*)queue)[queueIndex], *buffer, CL_FALSE, 0, sizeof(float) * dataSize, (const void*)dataSource, 0, NULL, NULL);
-    clSetKernelArg(*((cl_kernel*)kernel), paramIndex, sizeof(cl_mem), buffer);
+    cl_mem* buffer = new cl_mem;
+    size_t memSize = dataSize * dataCount;
+
+    *buffer = clCreateBuffer(*((cl_context*)context), CL_MEM_READ_WRITE, memSize, NULL, NULL);
+    clEnqueueWriteBuffer(((cl_command_queue*)queue)[queueIndex], *buffer, CL_FALSE, 0, memSize, (const void*)dataSource, 0, NULL, NULL);
 
     return (intptr_t)buffer;
 }
 
-void execute(intptr_t kernel, intptr_t queue, int queueIndex, 
+void execute(
+                intptr_t kernel,
+                intptr_t queue, int queueIndex, 
+                intptr_t* args, size_t argCount,
                 const size_t globX, const size_t globY, const size_t globZ,
                 const size_t localX, const size_t localY, const size_t localZ) {
 
-    // Step 8: Execute the kernel
+    for (int i = 0; i < argCount; i++) {
+        clSetKernelArg(*((cl_kernel*)kernel), i, sizeof(cl_mem), (cl_mem*)args[i]);
+    }
+
     size_t global_work_size[3] = { globX, globY, globZ };
     size_t local_work_size[3] = { localX, localY, localZ };
 
     wait(queue);
-    clEnqueueNDRangeKernel(((cl_command_queue*)queue)[queueIndex], *((cl_kernel*)kernel), 3, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    clEnqueueNDRangeKernel(
+            ((cl_command_queue*)queue)[queueIndex], 
+            *((cl_kernel*)kernel), 
+            3, 
+            NULL, 
+            global_work_size, 
+            local_work_size,
+            0, NULL, NULL);
     wait(queue);
 }
 
 
-int main() {
+int _main() {
     printCLDevices();
 
     const char* kernelSource = R"(
@@ -155,7 +164,7 @@ int main() {
                          __global int* N) {
         int id = get_global_id(0);
         if (id < N[0]) {
-            C[id] = A[id] * B[id];
+            C[id] = A[id] * B[id] + 2;
         }
     }
     )";
@@ -174,19 +183,16 @@ int main() {
     std::vector<float> C(N);       // Output vector C
     std::vector<float> D(1, N);
 
-    intptr_t a = copyData(context, kernel, 0, (intptr_t)A.data(), (size_t)N, queues, 0);
-    intptr_t b = copyData(context, kernel, 1, (intptr_t)B.data(), (size_t)N, queues, 1);
-    intptr_t c = copyData(context, kernel, 2, (intptr_t)C.data(), (size_t)N, queues, 2);
-    intptr_t d = copyData(context, kernel, 3, (intptr_t)D.data(), (size_t)1, queues, 3);
+    intptr_t dA = copyData(context, (intptr_t)A.data(), sizeof(float), (size_t)N, queues, 0);
+    intptr_t dB = copyData(context, (intptr_t)B.data(), sizeof(float), (size_t)N, queues, 1);
+    intptr_t dC = copyData(context, (intptr_t)C.data(), sizeof(float), (size_t)N, queues, 2);
+    intptr_t dD = copyData(context, (intptr_t)D.data(), sizeof(int), (size_t)1, queues, 3);
 
-    
-           
-    // Step 8: Execute the kernel
-
-    execute(kernel, queues, 0, 50000000, 10, 1, 100, 10, 1);
+    intptr_t arguments[] = { dA, dB, dC, dD };
+    execute(kernel, queues, 0, arguments, 4, 50000000, 10, 1, 100, 10, 1);
 
     // Step 10: Read back the result
-    clEnqueueReadBuffer(((cl_command_queue*)queues)[0], *((cl_mem*) c), CL_TRUE, 0, sizeof(float) * N, C.data(), 0, NULL, NULL);
+    clEnqueueReadBuffer(((cl_command_queue*)queues)[0], *((cl_mem*) dC), CL_TRUE, 0, sizeof(float) * N, C.data(), 0, NULL, NULL);
 
     // Step 11: Cleanup
     //clReleaseCommandQueue(queue);
