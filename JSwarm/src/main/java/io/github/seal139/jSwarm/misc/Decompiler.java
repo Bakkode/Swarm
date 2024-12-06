@@ -16,9 +16,9 @@ import java.util.function.Function;
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.api.OutputSinkFactory;
 
+import Program;
 import io.github.seal139.jSwarm.exception.DecompilationException;
 import io.github.seal139.jSwarm.misc.Worker;
-import io.github.seal139.jSwarm.runtime.Program;
 
 /**
  * Decompile Java byte code into generic source

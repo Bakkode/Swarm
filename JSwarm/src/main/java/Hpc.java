@@ -1,6 +1,3 @@
-import io.github.seal139.jSwarm.hardware.Hardware;
-import io.github.seal139.jSwarm.hardware.HardwareInfo;
-
 public class Hpc {	
 
 	private static void printDevice(HardwareInfo hi) {

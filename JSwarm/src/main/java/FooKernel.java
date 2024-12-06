@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.runtime;
+
 
 public final class FooKernel extends Program {
 	
