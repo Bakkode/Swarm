@@ -2,13 +2,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.management.ManagementFactory;
+import java.lang.ref.Cleaner.Cleanable;
 import java.util.List;
 
-import io.github.seal139.jSwarm.core.Decompiler;
-import io.github.seal139.jSwarm.runtime.ExampleKernel;
-import io.github.seal139.jSwarm.runtime.FooKernel;
-import io.github.seal139.jSwarm.wrapper.Swarm;
+import io.github.seal139.jSwarm.core.NativeCleaner;
+import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
+import io.github.seal139.jSwarm.core.Swarm;
+import io.github.seal139.jSwarm.misc.Decompiler;
 
 public class Test {	
 	public static void boo() {
@@ -35,9 +35,65 @@ public class Test {
         }
     }
 	
+	static class Boobo implements NativeResources{
+		
+		private static final class Del implements Deallocator {
+			int addr = 0;
+			
+			@Override
+			public void clean() {
+				System.out.println("-->>" + addr);
+			}
+		}
+		
+		
+		private final Del dealloc = new Del();
+		
+		Cleanable c;
+		
+		Boobo(){
+			c = NativeCleaner.register(this);
+		}
+		
+		void kaka() {
+			dealloc.addr = hashCode();
+			c.clean();
+			c.clean();
+		}
+		
+		@Override
+		public void close() throws Exception {
+			// TODO Auto-generated method stub
+		}
+
+		@Override
+		public Deallocator getDeallocator() {
+			return dealloc;
+		}
+
+		
+	}
 	
+		
 	public static void main (String ...strings ) throws Exception {
-		System.out.println(Swarm.isDebug());
+		for(int i = 0; i < 10000; i++) {
+			Boobo b = new Boobo();
+			b.kaka();
+		}
+		
+		BufferedReader reader = new BufferedReader(
+	            new InputStreamReader(System.in));
+
+	        // Reading data using readLine
+	        String name = reader.readLine();
+	        
+		 try {
+	            Thread.sleep(1000); // Wait a second
+	        } catch (InterruptedException e) {
+	            e.printStackTrace();
+	        }
+		
+		System.out.println(Swarm.isDebugMode());
 		
 		Test t = new Test();
 		
@@ -51,18 +107,12 @@ public class Test {
 		Decompiler d = Decompiler.getDefault();
 		
 		String s1 = d.process(List.of(ExampleKernel.class), this::processCuda);
-		String s2 = d.process(List.of(FooKernel.class), this::processCuda);
-		String s3 = d.process(List.of(ExampleKernel.class, FooKernel.class), this::processCuda);
 
 		
 		System.out.println();
 		
 		System.out.println(s1);
 		System.out.println("\n\n\n============\n\n\n");
-		System.out.println(s2);
-		System.out.println("\n\n\n============\n\n\n");
-		System.out.println(s3);
-		
 		
         
         try (InputStream input = Test.class.getResourceAsStream(classPath)) {

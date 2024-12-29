@@ -1,7 +1,11 @@
+package io.github.seal139.jSwarm.hardware;
 
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+
+import io.github.seal139.jSwarm.misc.Common;
 
 public final class Hardware {
 	public static native HardwareInfo[] enumerateCudaDevice();
@@ -22,6 +26,7 @@ public final class Hardware {
             roEnabled = false;
             
     	}catch (Throwable e) {
+    		e.printStackTrace();
     		
     		clEnabled = false;
     		cdEnabled = false;
@@ -41,9 +46,9 @@ public final class Hardware {
     	// Nvidia CUDA
     	if(cdEnabled) {
     		HardwareInfo[] hws = enumerateCudaDevice();
-    		for(HardwareInfo hw : hws) {
-    			this.hws.add(hw);	
-    		}
+//    		for(HardwareInfo hw : hws) {
+//    			this.hws.add(hw);	
+//    		}
     	}
     	
     	// AMD HIP - ROCm
@@ -75,6 +80,33 @@ public final class Hardware {
     	return hw;
     }
     
+    
+    public static void main(String ...strings ) throws Exception {
+    	Hardware hw = getInstance();
+    	
+    	HardwareInfo[] hws = hw.getHardwareList();
+
+    	
+    	ForkJoinPool pool  = new ForkJoinPool(1);
+    	
+    	for(int i = 0; i < 20; i++) {
+    		Common.queue(() ->{
+        		System.out.println("Called by: " +Thread.currentThread().getId()); 
+        		
+        		pool.execute(() -> {
+        			System.out.println("executed by: " +Thread.currentThread().getId()); 
+        		});
+        		return null;
+        	});
+    	}
+    	
+    	
+    	Common.await("", 1);
+    
+
+    	System.out.println("mbo");
+    	
+    }
     
     
 }

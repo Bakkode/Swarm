@@ -1,81 +1,85 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
-import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.DeviceType;
 import io.github.seal139.jSwarm.core.Executor;
 
 public class CudaDevice implements Executor {
 
-	@Override
-	public void close() throws Exception {
-		// TODO Auto-generated method stub
+    private final long  address;
+    private CudaContext context;
 
-	}
+    CudaDevice(long ptr) throws CudaException {
+        address = ptr;
+        context = new CudaContext(address);
+    }
 
-	@Override
-	public Context getDefaultContext() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    long getAddress() { return address; }
 
-	@Override
-	public Context newContext() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public CudaContext getDefaultContext() throws CudaException {
+        if (context.isClosed()) {
+            context = newContext();
+        }
 
-	@Override
-	public DeviceType getType() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+        return context;
+    }
 
-	@Override
-	public String getName() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public CudaContext newContext() throws CudaException {
+        return new CudaContext(address);
+    }
 
-	@Override
-	public long getComputeUnit() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    // ===== Information only =====
 
-	@Override
-	public long getTotalMemory() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    @Override
+    public DeviceType getType() { return null; }
 
-	@Override
-	public int getMaxNDRange() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    @Override
+    public String getName() {
+        // TODO Auto-generated method stub
+        return null;
+    }
 
-	@Override
-	public long[] getMaxIndexPerDimension() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public long getComputeUnit() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 
-	@Override
-	public long[] getMaxThreadPerDimension() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    @Override
+    public long getTotalMemory() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 
-	@Override
-	public int getMaxThread() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    @Override
+    public int getMaxNDRange() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 
-	@Override
-	public double getFlops() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    @Override
+    public long[] getMaxIndexPerDimension() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public long[] getMaxThreadPerDimension() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public int getMaxThread() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public double getFlops() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 
 }
