@@ -4,8 +4,10 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-
-import io.github.seal139.jSwarm.core.Context;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Provide as huge data chunk for parallel process. The purpose of this class it
@@ -27,292 +29,288 @@ import io.github.seal139.jSwarm.core.Context;
  * @param <T>
  */
 public abstract class Vector<T extends Number> implements List<T> {
+    // Implemented using ring buffer
 
-    public long getAddress() { return 0l; }
+    protected final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
-    public long getNativeSize() { return 0l; }
+    protected final class Bucket {
+        private Bucket         next;
+        private final int      maxIndex;
+        private final Number[] storage;
 
-    public long getContextAddress(Context ctx) {
-        return 0l;
+        Bucket(int size) {
+            this.maxIndex = size;
+            this.storage  = new Number[size];
+        }
+
+        Bucket setNext(Bucket next) {
+            this.next = next;
+            return next;
+        }
+
+        private int indexPointer = 0;
+
+        Bucket addIncr(T t) {
+            // Prevent race condition when insertion is extremely fast that outrun
+            // synchronization process
+            synchronized (this.storage) {
+                this.storage[this.indexPointer++] = t;
+            }
+
+            if (this.indexPointer < this.maxIndex) {
+                return this;
+            }
+
+            Vector.this.synchronizer.submit(() -> flush());
+
+            return this.next;
+        }
+
+        private int size;
+
+        void fetch(int from, int to) {
+            synchronized (this.storage) {
+                // System.out.println("fetching " + this.storage.hashCode());
+                this.size = to-- - from;
+                Number[] t = sycnhronizeFrom(from, to);
+                for (int i = 0; i < this.size; i++) {
+                    this.storage[i] = t[i];
+                }
+            }
+
+        }
+
+        void flush() {
+            // Prevent race condition when insertion is extremely fast that outrun
+            // synchronization process
+            synchronized (this.storage) {
+                // System.out.println("flushing " + this.storage.hashCode());
+                sycnhronizeTo(this.storage, this.indexPointer);
+                this.indexPointer = 0;
+            }
+        }
     }
 
-    protected enum DataType {
-        /**
-         * Half precision 8 bit floating point. Currently not supported
-         */
-        HALF,
+    private Bucket bufferBucket;
 
-        /**
-         * Single precision 16 bit floating point.
-         */
-        FLOAT,
+    private final int bufferSize;
+    private final int bucketSize;
 
-        /**
-         * Double precision 32 bit floating point.
-         */
-        DOUBLE,
-
-        /**
-         * 8 bit signed integer. Currently not supported
-         */
-        BYTE,
-
-        /**
-         * 16 bit signed integer.
-         */
-        SHORT,
-
-        /**
-         * 32 bit signed integer.
-         */
-        INTEGER,
-
-        /**
-         * 64 bit signed integer.
-         */
-        LONG
+    protected Vector() {
+        this(512, 3);
     }
 
-    public enum CollectionStatus {
-        /**
-         * Memory space initialized in native-host side
-         */
-        INITIALIZED,
+    protected Vector(int bufferSize, int bucketSize) {
+        this.bufferSize = bufferSize;
+        this.bucketSize = bucketSize;
 
-        /**
-         * Memory space deallocated in native-host side
-         */
-        DESTROYED,
+        Bucket first = new Bucket(bufferSize);
 
-        /**
-         * Data is synchronized from / to device. Further data modification is not
-         * allowed.
-         */
-        SYNCHRONIZED
-    }
+        Bucket bucket = first;
+        for (int i = 1; i < bucketSize; i++) {
+            bucket = bucket.setNext(new Bucket(bufferSize));
+        }
 
-    public enum Purpose {
-
-        /**
-         * Indicates this data is used as input
-         */
-        PARAM_ARGS,
-
-        /**
-         * Indicates this data is used as output
-         */
-        PARAM_RETURN
-    }
-
-    protected static native long init(int type); // malloc
-    protected static native void destroy(long handle); // delete
-
-    protected native void insert(long handle, int type, T[] buffer, int size); // ptr add
-    protected native T update(long handle, int type, int index, T value); // ptr set
-    protected native void persist(long handle); // finalize data and sync to device memory
-    protected native T fetch(long handle, int type, int index); // get
-    protected native T[] fetchBulk(long handle, int type, int index, int count); // get All
-
-    protected final long    hwnd;
-    protected final T[]     buffer;
-    protected final int     maxBuffer;
-    protected final Purpose purpose;
-    protected final int     type;
-
-    protected int totalSize = 0;
-    protected int bufferIdx = 0;
-
-    @SuppressWarnings("unchecked")
-    protected Vector(Purpose purpose, int bufferSize, DataType type) {
-        this.maxBuffer = bufferSize;
-        this.purpose   = purpose;
-        this.type      = type.ordinal();
-        this.hwnd      = init(this.type);
-        this.buffer    = (T[]) new Object[bufferSize];
+        this.bufferBucket = bucket.setNext(first);
     }
 
     @Override
-    public boolean add(T e) {
-        totalSize           += 1;
-        buffer[bufferIdx++]  = e;
+    public Iterator<T> iterator() {
+        Future<?> ret = Vector.this.synchronizer.submit(() -> {
+            // Submit uncommited data first before iterating
+            this.bufferBucket.flush();
 
-        if (bufferIdx >= maxBuffer) {
-            insert(hwnd, type, buffer, bufferIdx);
-            bufferIdx = 0;
+            // Fetch initial data first
+            int size     = size();
+            int offset[] = {
+                    0 };
+
+            Bucket first = new Bucket(this.bufferSize);
+
+            if (size > this.bufferSize) {
+                offset[0] = this.bufferSize;
+                first.fetch(0, offset[0]);
+
+                // For the next bucket, do it in separate thread for performance
+                Vector.this.synchronizer.submit(() -> {
+                    Bucket bucket = first;
+                    for (int i = 1; i < this.bucketSize; i++) {
+                        bucket = bucket.setNext(new Bucket(this.bufferSize));
+
+                        // Default
+                        bucket.setNext(first);
+
+                        int begin = offset[0];
+                        offset[0] += this.bufferSize;
+
+                        if (offset[0] < size) {
+                            bucket.fetch(begin, offset[0]);
+                            continue;
+                        }
+
+                        bucket.fetch(begin, size);
+                        offset[0] = size;
+
+                        break;
+                    }
+                });
+            }
+            else {
+                offset[0] = size;
+                first.fetch(0, offset[0]);
+            }
+
+            return new Iterator<T>() {
+                Bucket bucket = first;
+
+                @Override
+                public T next() {
+                    Number value = this.bucket.storage[this.bucket.indexPointer++];
+
+                    if ((this.bucket.indexPointer >= this.bucket.size) && (this.bucket.size >= Vector.this.bufferSize)) {
+                        Bucket prevBucket = this.bucket;
+                        this.bucket = this.bucket.next;
+
+                        Vector.this.synchronizer.submit(() -> {
+                            int begin = offset[0];
+                            offset[0] += Vector.this.bufferSize;
+
+                            if (offset[0] < size) {
+                                prevBucket.fetch(begin, offset[0]);
+                            }
+                            else {
+                                prevBucket.fetch(begin, size);
+                            }
+                        });
+                    }
+
+                    return convert(value);
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return (this.bucket.indexPointer < this.bucket.size) || //
+                           ((this.bucket.size >= Vector.this.bufferSize) && (this.bucket.next.size > 0));
+                }
+            };
+        });
+
+        try {
+            return (Iterator<T>) ret.get();
+        }
+        catch (InterruptedException | ExecutionException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    abstract T convert(Number n);
+
+    @Override
+    public boolean add(T e) {
+        this.bufferBucket = this.bufferBucket.addIncr(e);
+        return true;
+    }
+
+    @Override
+    public boolean addAll(Collection<? extends T> c) {
+        c.forEach(e -> add(e));
+        return true;
+    }
+
+    @Override
+    public boolean containsAll(Collection<?> c) {
+        for (Object e : c) {
+            if (!contains(e)) {
+                return false;
+            }
         }
 
         return true;
     }
 
     @Override
-    public boolean addAll(Collection<? extends T> c) {
-        c.forEach(v -> add(v));
+    public boolean isEmpty() { return size() == 0; }
 
-        return true;
-    }
+    // -----=======~~ Abstract ~~~=======-----
 
-    @Override
-    public int size() {
-        return totalSize;
-    }
+    protected abstract void sycnhronizeTo(Number[] t, int size);
+    protected abstract Number[] sycnhronizeFrom(int beginIndex, int endIndex);
 
-    @Override
-    public boolean isEmpty() { return 0 == size(); }
+    // -----======= Not Supported =======-----
 
-    @Override
-    public Iterator<T> iterator() {
-
-        return new Iterator<T>() {
-            int offset     = 0;
-            int index      = 0;
-            int localIndex = 0;
-
-            private T[] ctr;
-
-            private boolean fetch() {
-                if (offset >= totalSize) {
-                    return false;
-                }
-
-                int count = totalSize - offset;
-                if (count > maxBuffer) {
-                    count = maxBuffer;
-                }
-
-                ctr     = fetchBulk(hwnd, type, offset, maxBuffer);
-                offset += count;
-
-                return true;
-            }
-
-            @Override
-            public boolean hasNext() {
-                return index < size();
-            }
-
-            @Override
-            public T next() {
-                if (!hasNext()) {
-                    throw new IllegalStateException("No more elements");
-                }
-
-                if (localIndex >= ctr.length) {
-                    fetch();
-                }
-
-                index++;
-                return ctr[localIndex++];
-            }
-        };
-    }
-
-    @Override
-    public void clear() {
-        destroy(hwnd);
-    }
-
-    @Override
-    public T get(int index) {
-        return fetch(hwnd, type, index);
-    }
-
-    @Override
-    public T set(int index, T element) {
-        return update(hwnd, type, index, element);
-    }
-
-    public void persist() {
-        persist(hwnd);
-    }
-
-    // Not supported
-
-    @Override
-    public Object[] toArray() {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    public <K> K[] toArray(K[] a) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public void add(int index, T element) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public T remove(int index) {
-        throw new RuntimeException("Insert / update only");
-    }
-
-    @Override
-    @Deprecated
-    public int indexOf(Object o) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public int lastIndexOf(Object o) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public ListIterator<T> listIterator() {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public ListIterator<T> listIterator(int index) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public List<T> subList(int fromIndex, int toIndex) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public boolean removeAll(Collection<?> c) {
-        throw new RuntimeException("Insert / update only");
-    }
-
-    @Override
-    @Deprecated
-    public boolean containsAll(Collection<?> c) {
-        throw new RuntimeException("Insert / update only");
-    }
-
-    @Override
-    @Deprecated
-    public boolean addAll(int index, Collection<? extends T> c) {
-        throw new RuntimeException("Not supported");
-    }
-
-    @Override
-    @Deprecated
-    public boolean contains(Object o) {
-        throw new RuntimeException("Insert / update only");
-    }
-
-    @Override
-    @Deprecated
-    public boolean remove(Object o) {
-        throw new RuntimeException("Insert / update only");
-    }
-
+    /**
+     * Not supported due to performance issue
+     */
     @Override
     @Deprecated
     public boolean retainAll(Collection<?> c) {
-        throw new RuntimeException("Insert / update only");
+        throw new UnsupportedOperationException("Not supported");
     }
 
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public void add(int index, T element) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public boolean addAll(int index, Collection<? extends T> c) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public final ListIterator<T> listIterator(int index) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public final ListIterator<T> listIterator() {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public final Object[] toArray() {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    @SuppressWarnings("hiding")
+    public final <T> T[] toArray(T[] a) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    /**
+     * Not supported due to performance issue
+     */
+    @Override
+    @Deprecated
+    public boolean removeAll(Collection<?> c) {
+        throw new UnsupportedOperationException("Not supported");
+    }
 }
