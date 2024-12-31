@@ -116,7 +116,7 @@ public final class LongVector extends Vector<Long> {
     // -----======= Native Operation =======-----
 
     private static native long int64Construct();
-    private static native long int64Delete(long address);
+    private static native void int64Delete(long address);
 
     private static native int int64Size(long address);
     private static native void int64Sync(long address, long[] num, int size);

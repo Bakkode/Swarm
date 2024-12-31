@@ -67,7 +67,7 @@ public final class Common {
                 throw new FileNotFoundException("No driver for " + platform + " found for this operating system");
             }
 
-            Files.copy(inputStream, f.toPath());
+            Files.copy(inputStream, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
 
         return f.getAbsolutePath();
@@ -82,7 +82,7 @@ public final class Common {
 
     /**
      * Is this program runs in debug mode?
-     * 
+     *
      * @return True only when debug
      */
     public static boolean isDebugMode() { return debug; }

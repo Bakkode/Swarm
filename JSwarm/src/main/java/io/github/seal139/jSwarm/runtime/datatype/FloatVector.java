@@ -116,7 +116,7 @@ public final class FloatVector extends Vector<Float> {
     // -----======= Native Operation =======-----
 
     private static native long fp32Construct();
-    private static native long fp32Delete(long address);
+    private static native void fp32Delete(long address);
 
     private static native int fp32Size(long address);
     private static native void fp32Sync(long address, float[] num, int size);

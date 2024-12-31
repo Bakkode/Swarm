@@ -6,6 +6,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
+import io.github.seal139.jSwarm.misc.Common;
 
 /**
  * Provide as huge data chunk for parallel process. The purpose of this class it
@@ -59,6 +60,15 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
     // the bucket and SYNCHRONIZER is responsible to UNLOCK the bucket. If bucket is
     // locked, use busy-waiting on that. Since operation and synchronization did not
     // overlap, no race condition is guaranteed
+
+    static {
+        try {
+            System.load(Common.getDriverByOs("Vector", "Vector"));
+        }
+        catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
 
     protected final class Bucket {
         volatile int lockCount = 0;

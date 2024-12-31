@@ -116,7 +116,7 @@ public final class ShortVector extends Vector<Short> {
     // -----======= Native Operation =======-----
 
     private static native long int16Construct();
-    private static native long int16Delete(long address);
+    private static native void int16Delete(long address);
 
     private static native int int16Size(long address);
     private static native void int16Sync(long address, short[] num, int size);

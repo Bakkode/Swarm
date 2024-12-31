@@ -116,7 +116,7 @@ public final class IntegerVector extends Vector<Integer> {
     // -----======= Native Operation =======-----
 
     private static native long int32Construct();
-    private static native long int32Delete(long address);
+    private static native void int32Delete(long address);
 
     private static native int int32Size(long address);
     private static native void int32Sync(long address, int[] num, int size);

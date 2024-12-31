@@ -116,7 +116,7 @@ public final class DoubleVector extends Vector<Double> {
     // -----======= Native Operation =======-----
 
     private static native long fp64Construct();
-    private static native long fp64Delete(long address);
+    private static native void fp64Delete(long address);
 
     private static native int fp64Size(long address);
     private static native void fp64Sync(long address, double[] num, int size);
