@@ -3,7 +3,6 @@ package io.github.seal139.jSwarm.runtime.datatype;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.misc.Common;
@@ -70,81 +69,31 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
         }
     }
 
-    protected final class Bucket {
+    protected abstract class AbstractBucket {
+        protected int indexPointer = 0;
+        protected int size;
+
         volatile int lockCount = 0;
 
-        private Bucket next;
+        protected AbstractBucket next;
 
-        private final int      maxIndex;
-        private final Number[] storage;
+        abstract AbstractBucket setNext(AbstractBucket bucket);
 
-        Bucket(int size) {
-            this.maxIndex = size;
-            this.storage  = new Number[size];
-        }
+        abstract AbstractBucket addIncr(T t);
 
-        Bucket setNext(Bucket bucket) {
-            this.next = bucket;
+        abstract T getStorageValue(int index);
 
-            return bucket;
-        }
+        abstract void fetch(final int from, final int to);
 
-        private int indexPointer = 0;
+        abstract void flush();
 
-        Bucket addIncr(T t) {
-            waitBucket(this);
-
-            this.storage[this.indexPointer++] = t;
-
-            if (this.indexPointer < this.maxIndex) {
-                return this;
-            }
-
-            flush();
-
-            return this.next;
-        }
-
-        private int size;
-
-        Future<?> fetch(int from, int to) {
-            waitBucket(this);
-
-            this.lockCount += 1;
-            return Vector.this.getSynchronizer().submit(() -> {
-                this.indexPointer = 0;
-
-                this.size = to - from;
-                Number[] t = sycnhronizeFrom(from, to - 1);
-                for (int i = 0; i < this.size; i++) {
-                    this.storage[i] = t[i];
-                }
-
-                this.lockCount -= 1;
-            });
-        }
-
-        void flush() {
-            if (this.indexPointer == 0) {
-                return;
-            }
-
-            waitBucket(this);
-
-            this.lockCount += 1;
-            Vector.this.getSynchronizer().submit(() -> {
-                sycnhronizeTo(this.storage, this.indexPointer);
-                this.indexPointer = 0;
-
-                this.lockCount -= 1;
-            });
-        }
+        abstract boolean waitBucket();
     }
 
-    private Bucket bufferBucket;
+    private AbstractBucket bufferBucket;
 
-    private final int bufferSize;
-    private final int bucketSize;
+    protected final int bufferSize;
+    protected final int bucketSize;
 
     protected Vector() {
         this(512, 3);
@@ -154,123 +103,99 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
         this.bufferSize = bufferSize;
         this.bucketSize = bucketSize;
 
-        Bucket first = new Bucket(bufferSize);
+        AbstractBucket first = newBucket(bufferSize);
 
-        Bucket bucket = first;
+        AbstractBucket bucket = first;
         for (int i = 1; i < bucketSize; i++) {
-            bucket = bucket.setNext(new Bucket(bufferSize));
+            bucket = bucket.setNext(newBucket(bufferSize));
         }
 
         this.bufferBucket = bucket.setNext(first);
     }
 
-    protected void waitBucket(Bucket bucket) {
-        int i = 0;
-        while (bucket.lockCount > 0) {
-            i += 1;
-            // NoOp. but can be used to detect wait cycle
-        }
-
-        if (i != 0) {
-            try {
-                throw new Exception("hit : i");
-            }
-            catch (Exception e) {
-                System.out.println(">>" + bucket.hashCode() + ":" + i);
-                e.printStackTrace();
-            }
-        }
+    public void flush() {
+        this.bufferBucket.flush();
+        waitAll();
     }
 
-    protected void waitAll() {
-        waitBucket(this.bufferBucket);
+    public void waitAll() {
+        this.bufferBucket.waitBucket();
 
-        Bucket bucket = this.bufferBucket.next;
+        AbstractBucket bucket = this.bufferBucket.next;
         while (!this.bufferBucket.equals(bucket)) {
-            waitBucket(bucket);
+            bucket.waitBucket();
             bucket = bucket.next;
         }
     }
 
     @Override
     public Iterator<T> iterator() {
-        waitAll();
-
         this.bufferBucket.flush();
 
-        waitBucket(this.bufferBucket);
+        waitAll();
 
         // Fetch initial data first
         int size     = size();
         int offset[] = {
                 0 };
 
-        Bucket first  = new Bucket(this.bufferSize);
-        Bucket bucket = first;
+        AbstractBucket first = newBucket(this.bufferSize);
+
+        offset[0] = size > this.bufferSize ? this.bufferSize : size;
+        first.fetch(0, offset[0]);
+
+        AbstractBucket bucket = first;
         for (int i = 1; i < this.bucketSize; i++) {
-            bucket = bucket.setNext(new Bucket(this.bufferSize));
+            bucket = bucket.setNext(newBucket(this.bufferSize));
         }
         bucket.setNext(first);
 
-        try {
-            if (size > this.bufferSize) {
-                offset[0] = this.bufferSize;
-                first.fetch(0, offset[0]).get();
-            }
-            else {
-                offset[0] = size;
-                first.fetch(0, offset[0]).get();
-            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
+        first.waitBucket();
 
         return new Iterator<>() {
-            Bucket bucket = first;
+            AbstractBucket buck = first;
 
-            Future<?> f;
+            AbstractBucket syncBucket = first;
 
             private void fetchNext() {
-                Bucket nBucket = this.bucket.next;
+                AbstractBucket nBucket = this.syncBucket.next;
 
-                if (offset[0] < size) {
+                while (true) {
+                    if (offset[0] >= size) {
+                        nBucket.size = 0;
+                        break;
+                    }
 
                     int begin = offset[0];
                     offset[0] += Vector.this.bufferSize;
 
-                    if (offset[0] < size) {
-                        this.f = nBucket.fetch(begin, offset[0]);
-                    }
-                    else {
-                        this.f = nBucket.fetch(begin, size);
+                    if (offset[0] >= size) {
+                        nBucket.fetch(begin, size);
+                        break;
                     }
 
+                    nBucket.fetch(begin, offset[0]);
+
+                    if (nBucket.next.equals(this.syncBucket)) {
+                        this.syncBucket = nBucket;
+                        break;
+                    }
+
+                    nBucket = nBucket.next;
                 }
-                else {
-                    nBucket.size = 0;
-                }
+
             }
 
             @Override
             public T next() {
                 try {
-                    Number value = this.bucket.storage[this.bucket.indexPointer];
-                    if (this.bucket.indexPointer == 0) {
+                    this.buck.waitBucket();
+
+                    Number value = this.buck.getStorageValue(this.buck.indexPointer);
+
+                    if (++this.buck.indexPointer >= this.buck.size) {
+                        this.buck = this.buck.next;
                         fetchNext();
-                    }
-
-                    if (++this.bucket.indexPointer >= this.bucket.size) {
-                        try {
-                            if (this.f != null) {
-                                this.f.get();
-                            }
-                        }
-                        catch (Exception e) {
-                            e.printStackTrace();
-                        }
-
-                        this.bucket = this.bucket.next;
                     }
 
                     return convert(value);
@@ -282,9 +207,9 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
 
             @Override
             public boolean hasNext() {
-                waitBucket(this.bucket);
+                this.buck.waitBucket();
 
-                if (this.bucket.indexPointer < this.bucket.size) {
+                if (this.buck.indexPointer < this.buck.size) {
                     return true;
                 }
 
@@ -332,9 +257,8 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
 
     // -----=======~~ Abstract ~~~=======-----
     protected abstract T convert(Number n);
-    protected abstract void sycnhronizeTo(Number[] t, int size);
-    protected abstract Number[] sycnhronizeFrom(int beginIndex, int endIndex);
     protected abstract ExecutorService getSynchronizer();
+    protected abstract AbstractBucket newBucket(int size);
 
     // -----======= Not Supported =======-----
 

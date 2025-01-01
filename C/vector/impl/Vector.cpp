@@ -242,7 +242,15 @@ JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_Double
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_ShortVector_int16Sync(JNIEnv* env, jclass, jlong ptr, jshortArray source, jint count) {
 	std::vector<int16_t>* vec = reinterpret_cast<std::vector<int16_t>*>(ptr);
 
-	vec->reserve(vec->size() + count);
+	size_t finalSize = vec->size() + count;
+	if (finalSize > vec->capacity()) {
+		size_t tSize = vec->capacity() * 2;
+		if (tSize < finalSize) {
+			tSize = finalSize * 128;
+		}
+
+		vec->reserve(tSize);
+	}
 
 	jshort* elements = env->GetShortArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {
@@ -253,7 +261,15 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_ShortVecto
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_IntegerVector_int32Sync(JNIEnv* env, jclass, jlong ptr, jintArray source, jint count) {
 	std::vector<int32_t>* vec = reinterpret_cast<std::vector<int32_t>*>(ptr);
 
-	vec->reserve(vec->size() + count);
+	size_t finalSize = vec->size() + count;
+	if (finalSize > vec->capacity()) {
+		size_t tSize = vec->capacity() * 2;
+		if (tSize < finalSize) {
+			tSize = finalSize * 128;
+		}
+
+		vec->reserve(tSize);
+	}
 
 	jint* elements = env->GetIntArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {
@@ -264,7 +280,15 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_IntegerVec
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_LongVector_int64Sync(JNIEnv* env, jclass, jlong ptr, jlongArray source, jint count) {
 	std::vector<int64_t>* vec = reinterpret_cast<std::vector<int64_t>*>(ptr);
 
-	vec->reserve(vec->size() + count);
+	size_t finalSize = vec->size() + count;
+	if (finalSize > vec->capacity()) {
+		size_t tSize = vec->capacity() * 2;
+		if (tSize < finalSize) {
+			tSize = finalSize * 128;
+		}
+
+		vec->reserve(tSize);
+	}
 
 	jlong* elements = env->GetLongArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {
@@ -275,7 +299,15 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_LongVector
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync(JNIEnv* env, jclass, jlong ptr, jfloatArray source, jint count) {
 	std::vector<float_t>* vec = reinterpret_cast<std::vector<float_t>*>(ptr);
 
-	vec->reserve(vec->size() + count);
+	size_t finalSize = vec->size() + count;
+	if (finalSize > vec->capacity()) {
+		size_t tSize = vec->capacity() * 2;
+		if (tSize < finalSize) {
+			tSize = finalSize * 128;
+		}
+
+		vec->reserve(tSize);
+	}
 
 	jfloat* elements = env->GetFloatArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {
@@ -286,7 +318,15 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVecto
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_DoubleVector_fp64Sync(JNIEnv* env, jclass, jlong ptr, jdoubleArray source, jint count) {
 	std::vector<double_t>* vec = reinterpret_cast<std::vector<double_t>*>(ptr);
 
-	vec->reserve(vec->size() + count);
+	size_t finalSize = vec->size() + count;
+	if (finalSize > vec->capacity()) {
+		size_t tSize = vec->capacity() * 2;
+		if (tSize < finalSize) {
+			tSize = finalSize * 128;
+		}
+
+		vec->reserve(tSize);
+	}
 
 	jdouble* elements = env->GetDoubleArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {

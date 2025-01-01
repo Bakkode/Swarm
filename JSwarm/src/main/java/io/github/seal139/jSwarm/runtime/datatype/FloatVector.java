@@ -4,10 +4,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import io.github.seal139.jSwarm.core.NativeCleaner;
+import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 
-public final class FloatVector extends Vector<Float> {
+public final class FloatVector extends Vector<Float> implements NativeResources {
 
-    static final class DeallocatorImpl implements Deallocator {
+    final class DeallocatorImpl implements Deallocator {
         private final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
         private final long address;
@@ -19,11 +20,12 @@ public final class FloatVector extends Vector<Float> {
 
         @Override
         public void clean() {
-            this.synchronizer.shutdown();
+            waitAll();
 
-            fp32Clear(this.address);
+            // fp32Clear(this.address);
             fp32Delete(this.address);
 
+            this.synchronizer.shutdown();
             this.isClosed = true;
         }
     }
@@ -34,6 +36,12 @@ public final class FloatVector extends Vector<Float> {
 
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
+
+    public FloatVector() {
+        // -reach 15999600 ns (15.9ms) for write
+        // -reach 3685900 ns (3.2ms) for read
+        this(262136, 32);
+    }
 
     public FloatVector(int bufferSize, int bucketSize) {
         super(bufferSize, bucketSize);
@@ -51,6 +59,105 @@ public final class FloatVector extends Vector<Float> {
     public boolean isClosed() { return this.deallocator.isClosed; }
 
     // ============ Functionality Operation ==================
+
+    private final class Bucket extends AbstractBucket {
+
+        volatile int lockCount = 0;
+
+        private int     maxIndex;
+        private float[] storage;
+
+        Bucket(int size) {
+            this.maxIndex = size;
+            this.storage  = new float[size];
+        }
+
+        @Override
+        AbstractBucket setNext(AbstractBucket bucket) {
+            this.next = bucket;
+
+            return bucket;
+        }
+
+        @Override
+        protected boolean waitBucket() {
+            boolean b = false;
+            while (this.lockCount > 0) {
+                b = true;
+            }
+
+            return b;
+        }
+
+        @Override
+        Vector<Float>.AbstractBucket addIncr(Float t) {
+            if (waitBucket()) {
+                // this.maxIndex *= 1.5;
+                // this.storage = new float[this.maxIndex];
+            }
+
+            this.storage[this.indexPointer++] = t;
+
+            if (this.indexPointer < this.maxIndex) {
+                return this;
+            }
+
+            flush();
+
+            return this.next;
+        }
+
+        @Override
+        void fetch(final int from, final int to) {
+            waitBucket();
+
+            this.lockCount += 1;
+            FloatVector.this.getSynchronizer().submit(() -> {
+                this.indexPointer = 0;
+
+                this.size = to - from;
+                float[] t = sycnhronizeFrom(from, to - 1);
+                for (int i = 0; i < this.size; i++) {
+                    this.storage[i] = t[i];
+                }
+
+                this.lockCount -= 1;
+            });
+        }
+
+        @Override
+        void flush() {
+            if (this.indexPointer == 0) {
+                return;
+            }
+
+            this.waitBucket();
+
+            this.lockCount += 1;
+            getSynchronizer().submit(() -> {
+                sycnhronizeTo(this.storage, this.indexPointer);
+                this.indexPointer = 0;
+
+                this.lockCount -= 1;
+
+//
+//                if (++this.flushCounter == 5) {
+//                    this.flushCounter = 0;
+//
+//                }
+            });
+        }
+
+        @Override
+        Float getStorageValue(int index) {
+            return this.storage[index];
+        }
+    }
+
+    @Override
+    protected Vector<Float>.AbstractBucket newBucket(int size) {
+        return new Bucket(size);
+    }
 
     @Override
     protected ExecutorService getSynchronizer() { return this.deallocator.synchronizer; }
@@ -83,29 +190,14 @@ public final class FloatVector extends Vector<Float> {
         fp32Clear(this.deallocator.address);
     }
 
-    @Override
-    protected void sycnhronizeTo(Number[] t, int size) {
-        float[] f = new float[size];
-
-        for (int i = 0; i < size; i++) {
-            f[i] = t[i].floatValue();
-        }
-
-        fp32Sync(this.deallocator.address, f, size);
+    protected void sycnhronizeTo(float[] t, int size) {
+        // long ctr = System.nanoTime();
+        fp32Sync(this.deallocator.address, t, size);
+        // System.out.println("Sync time: " + ((System.nanoTime() - ctr) / 1000000.0));
     }
 
-    @Override
-    protected Number[] sycnhronizeFrom(int beginIndex, int endIndex) {
-        int size = (1 + endIndex) - beginIndex;
-
-        float[] from = fp32Fetch(this.deallocator.address, beginIndex, endIndex);
-        Float[] f    = new Float[size];
-
-        for (int i = 0; i < size; i++) {
-            f[i] = from[i];
-        }
-
-        return f;
+    protected float[] sycnhronizeFrom(int beginIndex, int endIndex) {
+        return fp32Fetch(this.deallocator.address, beginIndex, endIndex);
     }
 
     @Override
