@@ -3,6 +3,7 @@ package io.github.seal139.jSwarm.runtime.datatype;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.misc.Common;
@@ -88,7 +89,11 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
         abstract void flush();
 
         abstract boolean waitBucket();
+
+        protected AtomicBoolean writting = new AtomicBoolean(false);
     }
+
+    protected AtomicBoolean synchronizing = new AtomicBoolean(false);
 
     private AbstractBucket bufferBucket;
 

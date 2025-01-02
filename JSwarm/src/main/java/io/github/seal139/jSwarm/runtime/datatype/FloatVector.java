@@ -91,10 +91,13 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
         @Override
         Vector<Float>.AbstractBucket addIncr(Float t) {
+//            AbstractBucket nextBucket = this.next;
             if (waitBucket()) {
-                // this.maxIndex *= 1.5;
-                // this.storage = new float[this.maxIndex];
+                // System.out.println("Capek nunggu");
             }
+
+            // this.maxIndex *= 1.5;
+            // this.storage = new float[this.maxIndex];
 
             this.storage[this.indexPointer++] = t;
 
@@ -131,20 +134,12 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
                 return;
             }
 
-            this.waitBucket();
-
             this.lockCount += 1;
             getSynchronizer().submit(() -> {
                 sycnhronizeTo(this.storage, this.indexPointer);
                 this.indexPointer = 0;
 
                 this.lockCount -= 1;
-
-//
-//                if (++this.flushCounter == 5) {
-//                    this.flushCounter = 0;
-//
-//                }
             });
         }
 

@@ -1,5 +1,6 @@
 ﻿#include "../header/Vector.h"
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -56,6 +57,7 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVecto
 	std::vector<float_t>* vec = reinterpret_cast<std::vector<float_t>*>(ptr);
 
 	delete vec;
+	//std::cout << "mem deleted" << std::endl;
 }
 
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_DoubleVector_fp64Delete(JNIEnv*, jclass, jlong ptr) {
@@ -308,11 +310,16 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVecto
 
 		vec->reserve(tSize);
 	}
-
+	
 	jfloat* elements = env->GetFloatArrayElements(source, nullptr);
+	vec->insert(vec->end(), elements, elements + count);
+
+	/*jfloat* elements = env->GetFloatArrayElements(source, nullptr);
 	for (jint i = 0; i < count; ++i) {
 		vec->push_back(static_cast<float_t>(elements[i]));
-	}
+	}*/
+
+	env->ReleaseFloatArrayElements(source, elements, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_DoubleVector_fp64Sync(JNIEnv* env, jclass, jlong ptr, jdoubleArray source, jint count) {
@@ -332,6 +339,8 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_DoubleVect
 	for (jint i = 0; i < count; ++i) {
 		vec->push_back(static_cast<double_t>(elements[i]));
 	}
+
+	env->ReleaseDoubleArrayElements(source, elements, JNI_ABORT);
 }
 
 
@@ -389,12 +398,14 @@ JNIEXPORT jfloatArray JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_Flo
 	jint length = to - from + 1;
 	jfloatArray resultArray = env->NewFloatArray(length);
 
-	jfloat* tempBuffer = new jfloat[length];
+	/*jfloat* tempBuffer = new jfloat[length];
 	for (jint i = 0; i < length; ++i) {
 		tempBuffer[i] = static_cast<jfloat>((*vec)[from + i]);
 	}
 
-	env->SetFloatArrayRegion(resultArray, 0, length, tempBuffer);
+	env->SetFloatArrayRegion(resultArray, 0, length, tempBuffer);*/
+
+	env->SetFloatArrayRegion(resultArray, 0, length, reinterpret_cast<const jfloat*>(&(*vec)[from]));
 
 	return resultArray;
 }
