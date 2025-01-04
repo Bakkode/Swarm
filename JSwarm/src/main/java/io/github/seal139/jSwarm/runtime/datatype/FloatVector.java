@@ -1,10 +1,14 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import io.github.seal139.jSwarm.core.NativeCleaner;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
+import io.github.seal139.jSwarm.core.NativeException;
 
 public final class FloatVector extends Vector<Float> implements NativeResources {
 
@@ -22,7 +26,6 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         public void clean() {
             waitAll();
 
-            // fp32Clear(this.address);
             fp32Delete(this.address);
 
             this.synchronizer.shutdown();
@@ -37,16 +40,14 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
 
-    public FloatVector() {
-        // -reach 15999600 ns (15.9ms) for write
-        // -reach 3685900 ns (3.2ms) for read
+    public FloatVector() throws NativeException {
         this(262136, 32);
     }
 
-    public FloatVector(int bufferSize, int bucketSize) {
+    public FloatVector(int bufferSize, int bucketSize) throws NativeException {
         super(bufferSize, bucketSize);
 
-        this.deallocator = new DeallocatorImpl(fp32Construct());
+        this.deallocator = new DeallocatorImpl(fp32Construct(FloatVector.this.bucketSize * FloatVector.this.bufferSize));
         NativeCleaner.register(this);
     }
 
@@ -62,10 +63,8 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     private final class Bucket extends AbstractBucket {
 
-        volatile int lockCount = 0;
-
-        private int     maxIndex;
-        private float[] storage;
+        private int               maxIndex;
+        private transient float[] storage;
 
         Bucket(int size) {
             this.maxIndex = size;
@@ -82,22 +81,25 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         @Override
         protected boolean waitBucket() {
             boolean b = false;
-            while (this.lockCount > 0) {
+
+            while (this.locked) {
                 b = true;
             }
 
             return b;
         }
 
+        Long ctr = null;
+
         @Override
         Vector<Float>.AbstractBucket addIncr(Float t) {
-//            AbstractBucket nextBucket = this.next;
             if (waitBucket()) {
-                // System.out.println("Capek nunggu");
+
             }
 
-            // this.maxIndex *= 1.5;
-            // this.storage = new float[this.maxIndex];
+            if (this.ctr == null) {
+                this.ctr = System.nanoTime();
+            }
 
             this.storage[this.indexPointer++] = t;
 
@@ -114,32 +116,72 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         void fetch(final int from, final int to) {
             waitBucket();
 
-            this.lockCount += 1;
+            this.locked = true;
+
             FloatVector.this.getSynchronizer().submit(() -> {
                 this.indexPointer = 0;
 
                 this.size = to - from;
-                float[] t = sycnhronizeFrom(from, to - 1);
-                for (int i = 0; i < this.size; i++) {
-                    this.storage[i] = t[i];
-                }
+                // float[] t = sycnhronizeFrom(from, to - 1);
+                this.storage = sycnhronizeFrom(from, to - 1);
+//                for (int i = 0; i < this.size; i++) {
+//                    this.storage[i] = t[i];
+//                }
 
-                this.lockCount -= 1;
+                this.locked = false;
             });
         }
 
         @Override
         void flush() {
+
             if (this.indexPointer == 0) {
                 return;
             }
 
-            this.lockCount += 1;
-            getSynchronizer().submit(() -> {
-                sycnhronizeTo(this.storage, this.indexPointer);
-                this.indexPointer = 0;
+            this.locked = true;
 
-                this.lockCount -= 1;
+            if (FloatVector.this.queue.getAndIncrement() > 0) {
+                return;
+            }
+
+            getSynchronizer().submit(() -> {
+                // Long ctr = System.nanoTime();
+                Bucket b = this;
+                Bucket c;
+
+                while (true) {
+                    b.locked = true;
+
+                    int size = FloatVector.this.bucketSize * FloatVector.this.bufferSize;
+
+                    boolean isFull = false;
+                    try {
+                        isFull = fp32Sync(FloatVector.this.deallocator.address, b.storage, b.indexPointer, size);
+
+                    }
+                    catch (Throwable e) {
+
+                    }
+
+                    b.indexPointer = 0;
+
+                    c = b;
+                    b = (Bucket) b.next;
+
+                    c.locked = false;
+
+                    if (isFull) {
+                        fp32AllocateMore(FloatVector.this.deallocator.address, FloatVector.this.bucketSize * FloatVector.this.bufferSize, 2f);
+                    }
+
+                    if (FloatVector.this.queue.decrementAndGet() == 0) {
+                        return;
+                    }
+
+                }
+
+                // System.out.println("sync: " + ((System.nanoTime() - ctr) / 1000000.0));
             });
         }
 
@@ -159,7 +201,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     @Override
     public int size() {
-        return fp32Size(this.deallocator.address);
+        return fp32GetSize(this.deallocator.address);
     }
 
     @Override
@@ -185,12 +227,6 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         fp32Clear(this.deallocator.address);
     }
 
-    protected void sycnhronizeTo(float[] t, int size) {
-        // long ctr = System.nanoTime();
-        fp32Sync(this.deallocator.address, t, size);
-        // System.out.println("Sync time: " + ((System.nanoTime() - ctr) / 1000000.0));
-    }
-
     protected float[] sycnhronizeFrom(int beginIndex, int endIndex) {
         return fp32Fetch(this.deallocator.address, beginIndex, endIndex);
     }
@@ -202,14 +238,76 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     // -----======= Native Operation =======-----
 
-    private static native long fp32Construct();
+    private static native long fp32Construct(int cacheSize);
     private static native void fp32Delete(long address);
 
-    private static native int fp32Size(long address);
-    private static native void fp32Sync(long address, float[] num, int size);
+    private static native int fp32GetSize(long address);
+
+    private static native void fp32AllocateMore(long address, int cacheSize, float resizePolicy);
+    private static native boolean fp32Sync(long address, float[] num, int size, int cacheSize);
     private static native float[] fp32Fetch(long address, int begin, int to);
 
+    private static native float fp32GetByIndex(long address, int index);
     private static native boolean fp32Contains(long address, float num);
     private static native boolean fp32Remove(long address, float num);
+    private static native void fp32RemoveByIndex(long address, int index);
+
     private static native void fp32Clear(long address);
+
+    @Override
+    public boolean addAll(int index, Collection<? extends Float> c) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public Float get(int index) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public Float set(int index, Float element) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void add(int index, Float element) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public Float remove(int index) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public int indexOf(Object o) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    @Override
+    public ListIterator<Float> listIterator() {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    @Override
+    public ListIterator<Float> listIterator(int index) {
+        throw new UnsupportedOperationException("Not supported");
+    }
+
+    @Override
+    public List<Float> subList(int fromIndex, int toIndex) {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

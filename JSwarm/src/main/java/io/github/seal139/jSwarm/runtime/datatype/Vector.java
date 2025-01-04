@@ -2,11 +2,12 @@ package io.github.seal139.jSwarm.runtime.datatype;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
-import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.core.NativeException;
 
 /**
  * Provide as huge data chunk for parallel process. The purpose of this class it
@@ -27,7 +28,7 @@ import io.github.seal139.jSwarm.misc.Common;
  *
  * @param <T>
  */
-public abstract class Vector<T extends Number> implements NativeResources, Collection<T> {
+public abstract class Vector<T extends Number> implements NativeResources, List<T> {
     // Implemented using ring buffer
     // Ring buffer is simply linked list where the last node connected to first node
     // Making it no head and no tail
@@ -61,12 +62,22 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
     // locked, use busy-waiting on that. Since operation and synchronization did not
     // overlap, no race condition is guaranteed
 
+    private static final NativeException e;
     static {
+        Throwable le;
         try {
-            System.load(Common.getDriverByOs("Vector", "Vector"));
+            System.load("C:\\wsl\\Programming\\Swarm\\C\\vector\\out\\build\\x64-release\\Vector.dll");
+            le = null;
         }
         catch (Throwable e) {
-            e.printStackTrace();
+            le = e;
+        }
+
+        if (le != null) {
+            e = new NativeException(le);
+        }
+        else {
+            e = null;
         }
     }
 
@@ -74,7 +85,7 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
         protected int indexPointer = 0;
         protected int size;
 
-        volatile int lockCount = 0;
+        volatile boolean locked = false;
 
         protected AbstractBucket next;
 
@@ -89,22 +100,20 @@ public abstract class Vector<T extends Number> implements NativeResources, Colle
         abstract void flush();
 
         abstract boolean waitBucket();
-
-        protected AtomicBoolean writting = new AtomicBoolean(false);
     }
 
-    protected AtomicBoolean synchronizing = new AtomicBoolean(false);
+    protected volatile AtomicInteger queue = new AtomicInteger(0);
 
     private AbstractBucket bufferBucket;
 
     protected final int bufferSize;
     protected final int bucketSize;
 
-    protected Vector() {
-        this(512, 3);
-    }
+    protected Vector(int bufferSize, int bucketSize) throws NativeException {
+        if (e != null) {
+            throw e;
+        }
 
-    protected Vector(int bufferSize, int bucketSize) {
         this.bufferSize = bufferSize;
         this.bucketSize = bucketSize;
 
