@@ -17,7 +17,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         private final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
         private final long       address;
-        private final List<Long> nativeStorage = new ArrayList<>();
+        private final List<Long> nativeStorage = new ArrayList<>(32);
 
         private boolean isClosed = false;
 
@@ -59,10 +59,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     public FloatVector(int initial, int bufferSize, int bucketSize) throws NativeException {
         super(bufferSize, bucketSize);
 
-        long ctr = System.nanoTime();
         fp32Construct(initial);
-        ctr = System.nanoTime() - ctr;
-        System.out.println("Allocation: " + (((double) ctr) / 1_000_000));
 
         this.deallocator = new DeallocatorImpl(fp32Construct(initial));
         NativeCleaner.register(this);
@@ -93,45 +90,26 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
             this.maxIndex = size;
             this.storage  = new float[size];
 
-            try {
-                this.rwWrapper = hook();
-                FloatVector.this.bucketAddress.add(this.rwWrapper);
-            }
-            catch (Throwable e) {
-                e.printStackTrace();
-            }
-
+            this.rwWrapper = hook();
+            FloatVector.this.bucketAddress.add(this.rwWrapper);
         }
 
         @Override
         AbstractBucket setNext(AbstractBucket bucket) {
-            this.next = bucket;
-
+            this.next   = bucket;
+            bucket.prev = this;
             return bucket;
         }
 
         @Override
-        protected boolean waitBucket() {
-            boolean b = false;
-
+        protected void waitBucket() {
             while (this.locked) {
-                b = true;
             }
-
-            return b;
         }
-
-        Long ctr = null;
 
         @Override
         Vector<Float>.AbstractBucket addIncr(Float t) {
-            if (waitBucket()) {
-
-            }
-
-            if (this.ctr == null) {
-                this.ctr = System.nanoTime();
-            }
+            waitBucket();
 
             this.storage[this.indexPointer++] = t;
 
@@ -154,7 +132,6 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
                 this.indexPointer = 0;
 
                 this.size = to - from;
-                // float[] t = sycnhronizeFrom(from, to - 1);
                 fp32Fetch(FloatVector.this.deallocator.address, this.rwWrapper, from, to - 1);
 
                 this.locked = false;
@@ -164,53 +141,43 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         @Override
         void flush() {
 
-            if (this.indexPointer == 0) {
+            this.locked = (this.indexPointer != 0);
+            if (!this.locked) {
                 return;
             }
-
-            this.locked = true;
 
             if (FloatVector.this.queue.getAndIncrement() > 0) {
                 return;
             }
 
             getSynchronizer().submit(() -> {
-                // Long ctr = System.nanoTime();
                 Bucket b = this;
-                Bucket c;
-
                 while (true) {
-                    b.locked = true;
-
-                    int size = FloatVector.this.bucketSize * FloatVector.this.bufferSize;
-
-                    boolean isFull = false;
-                    try {
-                        isFull = fp32Sync(FloatVector.this.deallocator.address, b.rwWrapper, b.indexPointer, size);
-
-                    }
-                    catch (Throwable e) {
-                        e.printStackTrace();
-                    }
+                    boolean isFull = fp32Sync(FloatVector.this.deallocator.address, b.rwWrapper, b.indexPointer, this.maxIndex);
 
                     b.indexPointer = 0;
+                    b.locked       = false;
 
-                    c = b;
                     b = (Bucket) b.next;
 
-                    c.locked = false;
-
                     if (isFull) {
-                        fp32AllocateMore(FloatVector.this.deallocator.address, FloatVector.this.bucketSize * FloatVector.this.bufferSize, 2f);
+                        Bucket         first  = new Bucket(FloatVector.this.bufferSize);
+                        AbstractBucket bucket = first;
+
+                        for (int i = 1; i < FloatVector.this.bucketSize; i++) {
+                            bucket = bucket.setNext(newBucket(FloatVector.this.bufferSize));
+                        }
+
+                        b.prev.setNext(first);
+                        bucket.setNext(b);
+
+                        fp32AllocateMore(FloatVector.this.deallocator.address, this.maxIndex, 2f);
                     }
 
                     if (FloatVector.this.queue.decrementAndGet() == 0) {
                         return;
                     }
-
                 }
-
-                // System.out.println("sync: " + ((System.nanoTime() - ctr) / 1000000.0));
             });
         }
 

@@ -102,7 +102,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
         abstract void flush();
 
-        abstract boolean waitBucket();
+        abstract void waitBucket();
     }
 
     protected volatile AtomicInteger queue = new AtomicInteger(0);
@@ -110,7 +110,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     private AbstractBucket bufferBucket;
 
     protected final int        bufferSize;
-    protected final int        bucketSize;
+    protected int              bucketSize;
     protected final List<Long> bucketAddress = new ArrayList<>();
 
     protected Vector(int bufferSize, int bucketSize) throws NativeException {
@@ -148,8 +148,6 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
     @Override
     public Iterator<T> iterator() {
-        this.bufferBucket.flush();
-
         waitAll();
 
         // Fetch initial data first
@@ -157,23 +155,48 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         int offset[] = {
                 0 };
 
-        AbstractBucket first = newBucket(this.bufferSize);
+//        int iterSize;
+//
+//        if (size <= 1_000_000) {
+//            iterSize = 4;
+//        }
+//        else if (size <= 2_000_000) {
+//            iterSize = 8;
+//        }
+//        else if (size <= 32_000_000) {
+//            iterSize = 16;
+//        }
+//        else if (size <= 128_000_000) {
+//            iterSize = 32;
+//        }
+//        else if (size <= 512_000_000) {
+//            iterSize = 64;
+//        }
+//        else {
+//            iterSize = 128;
+//        }
+
+//        AbstractBucket first = newBucket(this.bufferSize);
+//
+//        offset[0] = size > this.bufferSize ? this.bufferSize : size;
+//        first.fetch(0, offset[0]);
+//
+//        AbstractBucket bucket = first;
+//        for (int i = 1; i < this.bucketSize; i++) {
+//            bucket = bucket.setNext(newBucket(this.bufferSize));
+//        }
+//        bucket.setNext(first);
+//
+//        first.waitBucket();
 
         offset[0] = size > this.bufferSize ? this.bufferSize : size;
-        first.fetch(0, offset[0]);
-
-        AbstractBucket bucket = first;
-        for (int i = 1; i < this.bucketSize; i++) {
-            bucket = bucket.setNext(newBucket(this.bufferSize));
-        }
-        bucket.setNext(first);
-
-        first.waitBucket();
+        this.bufferBucket.fetch(0, offset[0]);
+        this.bufferBucket.waitBucket();
 
         return new Iterator<>() {
-            AbstractBucket buck = first;
+            AbstractBucket buck = Vector.this.bufferBucket;
 
-            AbstractBucket syncBucket = first;
+            AbstractBucket syncBucket = Vector.this.bufferBucket;
 
             private void fetchNext() {
                 AbstractBucket nBucket = this.syncBucket.next;
@@ -226,12 +249,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
             @Override
             public boolean hasNext() {
                 this.buck.waitBucket();
-
-                if (this.buck.indexPointer < this.buck.size) {
-                    return true;
-                }
-
-                return false;
+                return this.buck.indexPointer < this.buck.size;
             }
         };
     }
