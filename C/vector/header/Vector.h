@@ -7,6 +7,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_00024Bucket_hook
+	(JNIEnv*, jobject);
+
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
 	 * Method:    fp32Construct
@@ -21,7 +24,7 @@ extern "C" {
 	 * Signature: (J)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Delete
-	(JNIEnv*, jclass, jlong);
+	(JNIEnv*, jclass, jlong, jlongArray);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
@@ -45,15 +48,15 @@ extern "C" {
 	 * Signature: (J[FI)Z
 	 */
 	JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync
-	(JNIEnv*, jclass, jlong, jfloatArray, jint, jint);
+	(JNIEnv*, jclass, jlong, jlong, jint, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
 	 * Method:    fp32Fetch
 	 * Signature: (JII)[F
 	 */
-	JNIEXPORT jfloatArray JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Fetch
-	(JNIEnv*, jclass, jlong, jint, jint);
+	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Fetch
+	(JNIEnv*, jclass, jlong, jlong, jint, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector

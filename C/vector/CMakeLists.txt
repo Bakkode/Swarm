@@ -48,9 +48,9 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # For Release builds, enable /O2 and AVX2
     target_compile_options(Vector PRIVATE
-        $<$<CXX_COMPILER_ID:MSVC>:/O2 /arch:AVX2>
-        $<$<CXX_COMPILER_ID:GNU>:-O2 -mavx2>
-        $<$<CXX_COMPILER_ID:Clang>:-O2 -mavx2>
+        $<$<CXX_COMPILER_ID:MSVC>:/O3 /arch:AVX2>
+        $<$<CXX_COMPILER_ID:GNU>:-O3 -mavx2>
+        $<$<CXX_COMPILER_ID:Clang>:-O3 -mavx2>
     )
 elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
     # For Debug builds, enable /RTC1 but do NOT use optimization /O2

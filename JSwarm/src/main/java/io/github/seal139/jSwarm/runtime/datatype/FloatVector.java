@@ -1,5 +1,6 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
@@ -15,18 +16,29 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     final class DeallocatorImpl implements Deallocator {
         private final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
-        private final long address;
-        private boolean    isClosed = false;
+        private final long       address;
+        private final List<Long> nativeStorage = new ArrayList<>();
+
+        private boolean isClosed = false;
 
         private DeallocatorImpl(long address) {
             this.address = address;
+        }
+
+        void add(long nativeStorage) {
+            this.nativeStorage.add(nativeStorage);
         }
 
         @Override
         public void clean() {
             waitAll();
 
-            fp32Delete(this.address);
+            long[] caches = new long[this.nativeStorage.size()];
+            for (int i = 0; i < this.nativeStorage.size(); i++) {
+                caches[i] = this.nativeStorage.get(i);
+            }
+
+            fp32Delete(this.address, caches);
 
             this.synchronizer.shutdown();
             this.isClosed = true;
@@ -41,14 +53,21 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     public Deallocator getDeallocator() { return this.deallocator; }
 
     public FloatVector() throws NativeException {
-        this(262136, 32);
+        this(1, 262136, 32);
     }
 
-    public FloatVector(int bufferSize, int bucketSize) throws NativeException {
+    public FloatVector(int initial, int bufferSize, int bucketSize) throws NativeException {
         super(bufferSize, bucketSize);
 
-        this.deallocator = new DeallocatorImpl(fp32Construct(FloatVector.this.bucketSize * FloatVector.this.bufferSize));
+        long ctr = System.nanoTime();
+        fp32Construct(initial);
+        ctr = System.nanoTime() - ctr;
+        System.out.println("Allocation: " + (((double) ctr) / 1_000_000));
+
+        this.deallocator = new DeallocatorImpl(fp32Construct(initial));
         NativeCleaner.register(this);
+
+        this.bucketAddress.forEach(v -> this.deallocator.add(v));
     }
 
     @Override
@@ -66,9 +85,22 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         private int               maxIndex;
         private transient float[] storage;
 
+        private transient long rwWrapper;
+
+        private native long hook();
+
         Bucket(int size) {
             this.maxIndex = size;
             this.storage  = new float[size];
+
+            try {
+                this.rwWrapper = hook();
+                FloatVector.this.bucketAddress.add(this.rwWrapper);
+            }
+            catch (Throwable e) {
+                e.printStackTrace();
+            }
+
         }
 
         @Override
@@ -123,10 +155,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
                 this.size = to - from;
                 // float[] t = sycnhronizeFrom(from, to - 1);
-                this.storage = sycnhronizeFrom(from, to - 1);
-//                for (int i = 0; i < this.size; i++) {
-//                    this.storage[i] = t[i];
-//                }
+                fp32Fetch(FloatVector.this.deallocator.address, this.rwWrapper, from, to - 1);
 
                 this.locked = false;
             });
@@ -157,11 +186,11 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
                     boolean isFull = false;
                     try {
-                        isFull = fp32Sync(FloatVector.this.deallocator.address, b.storage, b.indexPointer, size);
+                        isFull = fp32Sync(FloatVector.this.deallocator.address, b.rwWrapper, b.indexPointer, size);
 
                     }
                     catch (Throwable e) {
-
+                        e.printStackTrace();
                     }
 
                     b.indexPointer = 0;
@@ -227,10 +256,6 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         fp32Clear(this.deallocator.address);
     }
 
-    protected float[] sycnhronizeFrom(int beginIndex, int endIndex) {
-        return fp32Fetch(this.deallocator.address, beginIndex, endIndex);
-    }
-
     @Override
     protected Float convert(Number n) {
         return n.floatValue();
@@ -239,13 +264,13 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     // -----======= Native Operation =======-----
 
     private static native long fp32Construct(int cacheSize);
-    private static native void fp32Delete(long address);
+    private static native void fp32Delete(long address, long[] caches);
 
     private static native int fp32GetSize(long address);
 
     private static native void fp32AllocateMore(long address, int cacheSize, float resizePolicy);
-    private static native boolean fp32Sync(long address, float[] num, int size, int cacheSize);
-    private static native float[] fp32Fetch(long address, int begin, int to);
+    private static native boolean fp32Sync(long address, long bufferAddress, int size, int cacheSize);
+    private static native void fp32Fetch(long address, long bufferAddress, int begin, int to);
 
     private static native float fp32GetByIndex(long address, int index);
     private static native boolean fp32Contains(long address, float num);

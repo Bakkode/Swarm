@@ -1,5 +1,6 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -89,6 +90,8 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
         protected AbstractBucket next;
 
+        protected AbstractBucket prev;
+
         abstract AbstractBucket setNext(AbstractBucket bucket);
 
         abstract AbstractBucket addIncr(T t);
@@ -106,8 +109,9 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
     private AbstractBucket bufferBucket;
 
-    protected final int bufferSize;
-    protected final int bucketSize;
+    protected final int        bufferSize;
+    protected final int        bucketSize;
+    protected final List<Long> bucketAddress = new ArrayList<>();
 
     protected Vector(int bufferSize, int bucketSize) throws NativeException {
         if (e != null) {
