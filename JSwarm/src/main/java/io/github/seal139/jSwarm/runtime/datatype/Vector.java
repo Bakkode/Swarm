@@ -30,6 +30,7 @@ import io.github.seal139.jSwarm.core.NativeException;
  * @param <T>
  */
 public abstract class Vector<T extends Number> implements NativeResources, List<T> {
+
     // Implemented using ring buffer
     // Ring buffer is simply linked list where the last node connected to first node
     // Making it no head and no tail
@@ -96,7 +97,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
         abstract AbstractBucket addIncr(T t);
 
-        abstract T getStorageValue(int index);
+        abstract T getStorageValue();
 
         abstract void fetch(final int from, final int to);
 
@@ -151,104 +152,42 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         waitAll();
 
         // Fetch initial data first
-        int size     = size();
-        int offset[] = {
-                0 };
+        int size    = size();
+        int offset_ = size > this.bufferSize ? this.bufferSize : size;
 
-//        int iterSize;
-//
-//        if (size <= 1_000_000) {
-//            iterSize = 4;
-//        }
-//        else if (size <= 2_000_000) {
-//            iterSize = 8;
-//        }
-//        else if (size <= 32_000_000) {
-//            iterSize = 16;
-//        }
-//        else if (size <= 128_000_000) {
-//            iterSize = 32;
-//        }
-//        else if (size <= 512_000_000) {
-//            iterSize = 64;
-//        }
-//        else {
-//            iterSize = 128;
-//        }
-
-//        AbstractBucket first = newBucket(this.bufferSize);
-//
-//        offset[0] = size > this.bufferSize ? this.bufferSize : size;
-//        first.fetch(0, offset[0]);
-//
-//        AbstractBucket bucket = first;
-//        for (int i = 1; i < this.bucketSize; i++) {
-//            bucket = bucket.setNext(newBucket(this.bufferSize));
-//        }
-//        bucket.setNext(first);
-//
-//        first.waitBucket();
-
-        offset[0] = size > this.bufferSize ? this.bufferSize : size;
-        this.bufferBucket.fetch(0, offset[0]);
-        this.bufferBucket.waitBucket();
+        this.bufferBucket.fetch(0, offset_);
 
         return new Iterator<>() {
-            AbstractBucket buck = Vector.this.bufferBucket;
+            int offset = offset_;
 
-            AbstractBucket syncBucket = Vector.this.bufferBucket;
-
-            private void fetchNext() {
-                AbstractBucket nBucket = this.syncBucket.next;
-
-                while (true) {
-                    if (offset[0] >= size) {
-                        nBucket.size = 0;
-                        break;
-                    }
-
-                    int begin = offset[0];
-                    offset[0] += Vector.this.bufferSize;
-
-                    if (offset[0] >= size) {
-                        nBucket.fetch(begin, size);
-                        break;
-                    }
-
-                    nBucket.fetch(begin, offset[0]);
-
-                    if (nBucket.next.equals(this.syncBucket)) {
-                        this.syncBucket = nBucket;
-                        break;
-                    }
-
-                    nBucket = nBucket.next;
-                }
-
-            }
+            final int      bufferSize = Vector.this.bufferSize;
+            AbstractBucket buck       = Vector.this.bufferBucket;
 
             @Override
             public T next() {
-                try {
-                    this.buck.waitBucket();
+                // this.buck.waitBucket();
 
-                    Number value = this.buck.getStorageValue(this.buck.indexPointer);
+                Number value = this.buck.getStorageValue();
 
-                    if (++this.buck.indexPointer >= this.buck.size) {
-                        this.buck = this.buck.next;
-                        fetchNext();
+                if (this.buck.indexPointer == this.buck.size) {
+                    int begin = this.offset;
+                    this.offset += this.bufferSize;
+
+                    if (this.offset >= size) {
+                        this.buck.fetch(begin, size);
+                    }
+                    else {
+                        this.buck.fetch(begin, this.offset);
                     }
 
-                    return convert(value);
+                    // this.buck = this.buck.next;
                 }
-                catch (Exception e) {
-                    return null;
-                }
+
+                return convert(value);
             }
 
             @Override
             public boolean hasNext() {
-                this.buck.waitBucket();
                 return this.buck.indexPointer < this.buck.size;
             }
         };

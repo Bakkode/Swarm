@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.seal139.jSwarm.core.NativeCleaner;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
@@ -49,6 +50,8 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     private final DeallocatorImpl deallocator;
 
+    private final long address;
+
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
 
@@ -59,9 +62,9 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     public FloatVector(int initial, int bufferSize, int bucketSize) throws NativeException {
         super(bufferSize, bucketSize);
 
-        fp32Construct(initial);
+        this.address = fp32Construct(initial);
 
-        this.deallocator = new DeallocatorImpl(fp32Construct(initial));
+        this.deallocator = new DeallocatorImpl(this.address);
         NativeCleaner.register(this);
 
         this.bucketAddress.forEach(v -> this.deallocator.add(v));
@@ -77,7 +80,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     // ============ Functionality Operation ==================
 
-    private final class Bucket extends AbstractBucket {
+    private final class Bucket extends AbstractBucket implements Runnable {
 
         private int               maxIndex;
         private transient float[] storage;
@@ -110,6 +113,10 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
         @Override
         Vector<Float>.AbstractBucket addIncr(Float t) {
             waitBucket();
+//            if (this.locked) {
+//                this.storage[0] = t;
+//                return this;
+//            }
 
             this.storage[this.indexPointer++] = t;
 
@@ -124,18 +131,55 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
         @Override
         void fetch(final int from, final int to) {
-            waitBucket();
+            this.indexPointer = 0;
 
-            this.locked = true;
+            this.size = to - from;
+            if (this.size > 0) {
+                fp32Fetch(FloatVector.this.address, this.rwWrapper, from, to - 1);
 
-            FloatVector.this.getSynchronizer().submit(() -> {
-                this.indexPointer = 0;
+//               this.locked = true;
 
-                this.size = to - from;
-                fp32Fetch(FloatVector.this.deallocator.address, this.rwWrapper, from, to - 1);
+                // getSynchronizer().submit(() -> {
+                fp32Fetch(FloatVector.this.address, this.rwWrapper, from, to - 1);
+                // this.locked = false;
+                // });
+            }
+        }
 
-                this.locked = false;
-            });
+        @Override
+        public void run() {
+            long          address    = FloatVector.this.address;
+            int           bucketSize = FloatVector.this.bucketSize;
+            AtomicInteger queue      = FloatVector.this.queue;
+
+            Bucket b = this;
+            while (true) {
+                boolean isFull = fp32Sync(address, b.rwWrapper, b.indexPointer, b.maxIndex);
+
+                b.indexPointer = 0;
+                b.locked       = false;
+
+                if (isFull) {
+//                    AbstractBucket bucket = b;
+                    b = (Bucket) b.next;
+//
+//                    for (int i = 0; i < bucketSize; i++) {
+//                        bucket = bucket.setNext(newBucket(8192));
+//                    }
+//
+//                    bucket.setNext(b);
+
+                    fp32AllocateMore(address, b.maxIndex, 2f);
+                }
+                else {
+                    b = (Bucket) b.next;
+                }
+
+                if (queue.decrementAndGet() == 0) {
+                    return;
+                }
+            }
+
         }
 
         @Override
@@ -150,41 +194,11 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
                 return;
             }
 
-            getSynchronizer().submit(() -> {
-                Bucket b = this;
-                while (true) {
-                    boolean isFull = fp32Sync(FloatVector.this.deallocator.address, b.rwWrapper, b.indexPointer, this.maxIndex);
-
-                    b.indexPointer = 0;
-                    b.locked       = false;
-
-                    b = (Bucket) b.next;
-
-                    if (isFull) {
-                        Bucket         first  = new Bucket(FloatVector.this.bufferSize);
-                        AbstractBucket bucket = first;
-
-                        for (int i = 1; i < FloatVector.this.bucketSize; i++) {
-                            bucket = bucket.setNext(newBucket(FloatVector.this.bufferSize));
-                        }
-
-                        b.prev.setNext(first);
-                        bucket.setNext(b);
-
-                        fp32AllocateMore(FloatVector.this.deallocator.address, this.maxIndex, 2f);
-                    }
-
-                    if (FloatVector.this.queue.decrementAndGet() == 0) {
-                        return;
-                    }
-                }
-            });
+            getSynchronizer().submit(this);
         }
 
         @Override
-        Float getStorageValue(int index) {
-            return this.storage[index];
-        }
+        Float getStorageValue() { return this.storage[this.indexPointer++]; }
     }
 
     @Override
@@ -197,13 +211,13 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     @Override
     public int size() {
-        return fp32GetSize(this.deallocator.address);
+        return fp32GetSize(this.address);
     }
 
     @Override
     public boolean remove(Object o) {
         if (o instanceof Float) {
-            return fp32Remove(this.deallocator.address, ((Float) o).floatValue());
+            return fp32Remove(this.address, ((Float) o).floatValue());
         }
 
         return false;
@@ -212,7 +226,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
     @Override
     public boolean contains(Object o) {
         if (o instanceof Float) {
-            return fp32Contains(this.deallocator.address, ((Float) o).floatValue());
+            return fp32Contains(this.address, ((Float) o).floatValue());
         }
 
         return false;
@@ -220,7 +234,7 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     @Override
     public void clear() {
-        fp32Clear(this.deallocator.address);
+        fp32Clear(this.address);
     }
 
     @Override
