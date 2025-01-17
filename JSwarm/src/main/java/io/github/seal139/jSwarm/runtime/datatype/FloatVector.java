@@ -1,73 +1,152 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Iterator;
 
 import io.github.seal139.jSwarm.core.NativeCleaner;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.core.NativeException;
 
-public final class FloatVector extends Vector<Float> implements NativeResources {
+public final class FloatVector extends Vector<Float> {
 
-    final class DeallocatorImpl implements Deallocator {
-        private final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
+    private class FloatCacheDeallocator extends CacheDeallocator {
+        boolean cleaned = false;
 
-        private final long       address;
-        private final List<Long> nativeStorage = new ArrayList<>(32);
-
-        private boolean isClosed = false;
-
-        private DeallocatorImpl(long address) {
-            this.address = address;
-        }
-
-        void add(long nativeStorage) {
-            this.nativeStorage.add(nativeStorage);
+        protected FloatCacheDeallocator(long address) {
+            super(address);
         }
 
         @Override
         public void clean() {
-            waitAll();
-
-            long[] caches = new long[this.nativeStorage.size()];
-            for (int i = 0; i < this.nativeStorage.size(); i++) {
-                caches[i] = this.nativeStorage.get(i);
+            if (this.cleaned) {
+                return;
             }
 
-            fp32Delete(this.address, caches);
+            this.cleaned = true;
+            fp32Unhook(this.address);
+        }
+    }
 
-            this.synchronizer.shutdown();
-            this.isClosed = true;
+    private final class Iter implements Iterator<Float>, NativeResources {
+        protected final int     size          = size();
+        protected final int     iterCacheSize = FloatVector.this.cacheSize;
+        protected final float[] cache         = new float[this.iterCacheSize];
+        protected final long    iterCacheAddress;
+
+        protected int indexPointer = 0;
+
+        protected int offset      = this.size > this.iterCacheSize ? this.iterCacheSize : this.size;
+        protected int fetchedSize = this.offset;
+
+        private final CacheDeallocator deallocator;
+
+        protected Iter() {
+            this.iterCacheAddress = fp32Hook(this.cache);
+            fetch(this.iterCacheAddress, 0, this.offset);
+
+            this.deallocator = new FloatCacheDeallocator(this.iterCacheAddress);
+
+            NativeCleaner.register(this);
+        }
+
+        @Override
+        public Float next() {
+            Number value = this.cache[this.indexPointer++];
+
+            if ((this.indexPointer == this.iterCacheSize) && (this.offset < this.size)) {
+                this.indexPointer = 0;
+                int begin = this.offset;
+                this.offset += this.iterCacheSize;
+
+                if (this.offset >= this.size) {
+                    fetch(this.iterCacheAddress, begin, this.size);
+                    this.fetchedSize = this.size - begin;
+
+                    // Release native resources as there's no object
+                    // left to be fetched
+                    this.deallocator.clean();
+                }
+                else {
+                    fetch(this.iterCacheAddress, begin, this.offset);
+                    this.fetchedSize = this.offset - begin;
+                }
+            }
+
+            return value.floatValue();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return this.indexPointer < this.fetchedSize;
+        }
+
+        @Override
+        public void close() throws Exception {
+            this.deallocator.clean();
+        }
+
+        @Override
+        public Deallocator getDeallocator() { return this.deallocator; }
+
+        @Override
+        public boolean isClosed() { return this.deallocator.isClosed; }
+    }
+
+    @Override
+    public Iterator<Float> iterator() {
+        return new Iter();
+    }
+
+    private final class FloatDeallocator extends VectorDeallocator {
+        private FloatDeallocator(long vAddress, long cAddress) {
+            super(vAddress, cAddress);
+        }
+
+        @Override
+        public void clean() {
+            super.clean();
+
+            fp32Delete(this.vectorAddress);
+            fp32Unhook(this.cacheAddress);
         }
     }
 
     // ============ Allocator - Deallocator ==================
 
-    private final DeallocatorImpl deallocator;
+    private final VectorDeallocator deallocator;
 
-    private final long address;
+    // Cache (Concurrent)
+    private final float[] cache;
+
+    private final long vectorAddress;
+    private final long cacheAddress;
 
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
 
+    private static final int DEF_CACHE_SIZE = 128;
+    private static final int DEF_INIT_SIZE  = 256;
+
+    private static final int SMALL_OPTIMIZED = /* x */16;
+
     public FloatVector() throws NativeException {
-        this(1, 262136, 32);
+        this(DEF_INIT_SIZE, DEF_CACHE_SIZE);
+
     }
 
-    public FloatVector(int initial, int bufferSize, int bucketSize) throws NativeException {
-        super(bufferSize, bucketSize);
+    public FloatVector(int initial) throws NativeException {
+        this(initial, (initial < DEF_CACHE_SIZE) ? initial : DEF_CACHE_SIZE);
+    }
 
-        this.address = fp32Construct(initial);
+    public FloatVector(int initial, int cacheSize) throws NativeException {
+        super(cacheSize);
 
-        this.deallocator = new DeallocatorImpl(this.address);
+        this.cache         = new float[cacheSize];
+        this.vectorAddress = fp32Construct(initial);
+        this.cacheAddress  = fp32Hook(this.cache);
+
+        this.deallocator = new FloatDeallocator(this.vectorAddress, this.cacheAddress);
         NativeCleaner.register(this);
-
-        this.bucketAddress.forEach(v -> this.deallocator.add(v));
     }
 
     @Override
@@ -80,240 +159,121 @@ public final class FloatVector extends Vector<Float> implements NativeResources 
 
     // ============ Functionality Operation ==================
 
-    private final class Bucket extends AbstractBucket implements Runnable {
+    @Override
+    public boolean add(Float e) {
+        this.cache[this.indexPointer++] = e;
 
-        private int               maxIndex;
-        private transient float[] storage;
-
-        private transient long rwWrapper;
-
-        private native long hook();
-
-        Bucket(int size) {
-            this.maxIndex = size;
-            this.storage  = new float[size];
-
-            this.rwWrapper = hook();
-            FloatVector.this.bucketAddress.add(this.rwWrapper);
+        if (this.indexPointer == this.cacheSize) {
+            sync();
         }
 
-        @Override
-        AbstractBucket setNext(AbstractBucket bucket) {
-            this.next   = bucket;
-            bucket.prev = this;
-            return bucket;
-        }
-
-        @Override
-        protected void waitBucket() {
-            while (this.locked) {
-            }
-        }
-
-        @Override
-        Vector<Float>.AbstractBucket addIncr(Float t) {
-            waitBucket();
-//            if (this.locked) {
-//                this.storage[0] = t;
-//                return this;
-//            }
-
-            this.storage[this.indexPointer++] = t;
-
-            if (this.indexPointer < this.maxIndex) {
-                return this;
-            }
-
-            flush();
-
-            return this.next;
-        }
-
-        @Override
-        void fetch(final int from, final int to) {
-            this.indexPointer = 0;
-
-            this.size = to - from;
-            if (this.size > 0) {
-                fp32Fetch(FloatVector.this.address, this.rwWrapper, from, to - 1);
-
-//               this.locked = true;
-
-                // getSynchronizer().submit(() -> {
-                fp32Fetch(FloatVector.this.address, this.rwWrapper, from, to - 1);
-                // this.locked = false;
-                // });
-            }
-        }
-
-        @Override
-        public void run() {
-            long          address    = FloatVector.this.address;
-            int           bucketSize = FloatVector.this.bucketSize;
-            AtomicInteger queue      = FloatVector.this.queue;
-
-            Bucket b = this;
-            while (true) {
-                boolean isFull = fp32Sync(address, b.rwWrapper, b.indexPointer, b.maxIndex);
-
-                b.indexPointer = 0;
-                b.locked       = false;
-
-                if (isFull) {
-//                    AbstractBucket bucket = b;
-                    b = (Bucket) b.next;
-//
-//                    for (int i = 0; i < bucketSize; i++) {
-//                        bucket = bucket.setNext(newBucket(8192));
-//                    }
-//
-//                    bucket.setNext(b);
-
-                    fp32AllocateMore(address, b.maxIndex, 2f);
-                }
-                else {
-                    b = (Bucket) b.next;
-                }
-
-                if (queue.decrementAndGet() == 0) {
-                    return;
-                }
-            }
-
-        }
-
-        @Override
-        void flush() {
-
-            this.locked = (this.indexPointer != 0);
-            if (!this.locked) {
-                return;
-            }
-
-            if (FloatVector.this.queue.getAndIncrement() > 0) {
-                return;
-            }
-
-            getSynchronizer().submit(this);
-        }
-
-        @Override
-        Float getStorageValue() { return this.storage[this.indexPointer++]; }
+        return true;
     }
 
     @Override
-    protected Vector<Float>.AbstractBucket newBucket(int size) {
-        return new Bucket(size);
+    public void sync() {
+        fp32Sync(this.vectorAddress, this.cacheAddress, this.indexPointer, 2f);
+        this.indexPointer = 0;
     }
 
     @Override
-    protected ExecutorService getSynchronizer() { return this.deallocator.synchronizer; }
+    protected void fetch(long cacheAddress, int from, int to) {
+        fp32Fetch(this.vectorAddress, cacheAddress, from, to - 1);
+    }
 
     @Override
     public int size() {
-        return fp32GetSize(this.address);
+        return fp32GetSize(this.vectorAddress);
     }
 
     @Override
     public boolean remove(Object o) {
-        if (o instanceof Float) {
-            return fp32Remove(this.address, ((Float) o).floatValue());
-        }
-
-        return false;
+        return fp32Remove(this.vectorAddress, ((Float) o).floatValue());
     }
 
     @Override
     public boolean contains(Object o) {
-        if (o instanceof Float) {
-            return fp32Contains(this.address, ((Float) o).floatValue());
-        }
-
-        return false;
+        return indexOf(o) > -1;
     }
 
     @Override
     public void clear() {
-        fp32Clear(this.address);
-    }
-
-    @Override
-    protected Float convert(Number n) {
-        return n.floatValue();
-    }
-
-    // -----======= Native Operation =======-----
-
-    private static native long fp32Construct(int cacheSize);
-    private static native void fp32Delete(long address, long[] caches);
-
-    private static native int fp32GetSize(long address);
-
-    private static native void fp32AllocateMore(long address, int cacheSize, float resizePolicy);
-    private static native boolean fp32Sync(long address, long bufferAddress, int size, int cacheSize);
-    private static native void fp32Fetch(long address, long bufferAddress, int begin, int to);
-
-    private static native float fp32GetByIndex(long address, int index);
-    private static native boolean fp32Contains(long address, float num);
-    private static native boolean fp32Remove(long address, float num);
-    private static native void fp32RemoveByIndex(long address, int index);
-
-    private static native void fp32Clear(long address);
-
-    @Override
-    public boolean addAll(int index, Collection<? extends Float> c) {
-        // TODO Auto-generated method stub
-        return false;
+        fp32Clear(this.vectorAddress);
     }
 
     @Override
     public Float get(int index) {
-        // TODO Auto-generated method stub
-        return null;
+        return fp32GetByIndex(this.vectorAddress, index);
     }
 
     @Override
     public Float set(int index, Float element) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public void add(int index, Float element) {
-        // TODO Auto-generated method stub
-
+        return fp32Set(this.vectorAddress, index, element.floatValue());
     }
 
     @Override
     public Float remove(int index) {
-        // TODO Auto-generated method stub
-        return null;
+        return fp32RemoveByIndex(this.vectorAddress, index);
     }
 
     @Override
     public int indexOf(Object o) {
-        // TODO Auto-generated method stub
-        return 0;
+        return fp32GetIndex(this.vectorAddress, ((Float) o).floatValue());
     }
 
     @Override
     public int lastIndexOf(Object o) {
-        throw new UnsupportedOperationException("Not supported");
+        return fp32GetLastIndex(this.vectorAddress, ((Float) o).floatValue());
     }
 
     @Override
-    public ListIterator<Float> listIterator() {
-        throw new UnsupportedOperationException("Not supported");
+    public boolean containsAll(Collection<?> c) {
+        float[] ref = new float[c.size()];
+
+        int index = -1;
+        for (Object f : c) {
+            ref[++index] = ((Float) f).floatValue();
+        }
+
+        return fp32ContainsAll(this.vectorAddress, ref);
     }
 
     @Override
-    public ListIterator<Float> listIterator(int index) {
-        throw new UnsupportedOperationException("Not supported");
+    public boolean removeAll(Collection<?> c) {
+        float[] ref = new float[c.size()];
+
+        int index = -1;
+        for (Object f : c) {
+            ref[++index] = ((Float) f).floatValue();
+        }
+
+        return fp32RemoveAll(this.vectorAddress, ref);
     }
 
-    @Override
-    public List<Float> subList(int fromIndex, int toIndex) {
-        // TODO Auto-generated method stub
-        return null;
-    }
+    // -----======= Native Operation =======-----
+
+    private static native long fp32Hook(float[] src); // Hook cache-array to native side
+    private static native void fp32Unhook(long address); // Unhok cache-array
+
+    private static native long fp32Construct(int cacheSize); // Create Vector
+    private static native void fp32Delete(long address); // Deallocate Vector
+
+    private static native int fp32GetSize(long address); // Get the size of Vector
+
+    private static native void fp32Sync(long address, long bufferAddress, int size, float resizePolicy); // [i, x) Synchronize data from cache to
+                                                                                                         // Vector
+    private static native void fp32Fetch(long address, long bufferAddress, int begin, int to); // [i, x) Synchronize data from Vector to cache
+
+    private static native boolean fp32ContainsAll(long address, float[] nums); // Is this Vector contains all the specified value?
+    private static native float fp32GetByIndex(long address, int index); // Get value from Vector at specified index
+    private static native int fp32GetIndex(long address, float num); // Get the first Vector index of specified value
+    private static native int fp32GetLastIndex(long address, float num); // Get the last Vector index of specified value
+
+    private static native boolean fp32Remove(long address, float num); // Remove value from Vector
+    private static native boolean fp32RemoveAll(long address, float[] nums); // Remove all contained value from Vector
+    private static native float fp32RemoveByIndex(long address, int index); // Remove value at specified index
+
+    private static native float fp32Set(long address, int index, float value); // Set value at specified index
+
+    private static native void fp32Clear(long address); // Clear vector entirely
 }

@@ -7,8 +7,21 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_00024Bucket_hook
-	(JNIEnv*, jobject);
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32Hook
+	 * Signature: ([F)J
+	 */
+	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Hook
+	(JNIEnv*, jclass, jfloatArray);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32Unhook
+	 * Signature: (J)V
+	 */
+	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Unhook
+	(JNIEnv*, jclass, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
@@ -24,7 +37,7 @@ extern "C" {
 	 * Signature: (J)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Delete
-	(JNIEnv*, jclass, jlong, jlongArray);
+	(JNIEnv*, jclass, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
@@ -36,27 +49,27 @@ extern "C" {
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
-	 * Method:    allocateMore
-	 * Signature: (JIF)V
-	 */
-	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32AllocateMore
-	(JNIEnv*, jclass, jlong, jint, jfloat);
-
-	/*
-	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
 	 * Method:    fp32Sync
-	 * Signature: (J[FI)Z
+	 * Signature: (JJIIF)V
 	 */
-	JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync
-	(JNIEnv*, jclass, jlong, jlong, jint, jint);
+	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync
+	(JNIEnv*, jclass, jlong, jlong, jint, jfloat);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
 	 * Method:    fp32Fetch
-	 * Signature: (JII)[F
+	 * Signature: (JJII)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Fetch
 	(JNIEnv*, jclass, jlong, jlong, jint, jint);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32ContainsAll
+	 * Signature: (J[F)Z
+	 */
+	JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32ContainsAll
+	(JNIEnv*, jclass, jlong, jfloatArray);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
@@ -68,10 +81,18 @@ extern "C" {
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
-	 * Method:    fp32Contains
-	 * Signature: (JF)Z
+	 * Method:    fp32GetIndex
+	 * Signature: (JF)I
 	 */
-	JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Contains
+	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32GetIndex
+	(JNIEnv*, jclass, jlong, jfloat);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32GetLastIndex
+	 * Signature: (JF)I
+	 */
+	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32GetLastIndex
 	(JNIEnv*, jclass, jlong, jfloat);
 
 	/*
@@ -84,11 +105,27 @@ extern "C" {
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
-	 * Method:    fp32RemoveByIndex
-	 * Signature: (JI)Z
+	 * Method:    fp32RemoveAll
+	 * Signature: (J[F)Z
 	 */
-	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32RemoveByIndex
+	JNIEXPORT jboolean JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32RemoveAll
+	(JNIEnv*, jclass, jlong, jfloatArray);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32RemoveByIndex
+	 * Signature: (JI)F
+	 */
+	JNIEXPORT jfloat JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32RemoveByIndex
 	(JNIEnv*, jclass, jlong, jint);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector
+	 * Method:    fp32Set
+	 * Signature: (JIF)F
+	 */
+	JNIEXPORT jfloat JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Set
+	(JNIEnv*, jclass, jlong, jint, jfloat);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector

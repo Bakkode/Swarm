@@ -1,11 +1,10 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executors;
 
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.core.NativeException;
@@ -83,185 +82,129 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         }
     }
 
-    protected abstract class AbstractBucket {
-        protected int indexPointer = 0;
-        protected int size;
+    protected abstract class CacheDeallocator implements Deallocator {
+        protected final long address;
+        protected boolean    isClosed = false;
 
-        volatile boolean locked = false;
+        protected CacheDeallocator(long address) {
+            this.address = address;
+        }
 
-        protected AbstractBucket next;
+        @Override
+        public void clean() {
+            if (this.isClosed) {
+                return;
+            }
 
-        protected AbstractBucket prev;
-
-        abstract AbstractBucket setNext(AbstractBucket bucket);
-
-        abstract AbstractBucket addIncr(T t);
-
-        abstract T getStorageValue();
-
-        abstract void fetch(final int from, final int to);
-
-        abstract void flush();
-
-        abstract void waitBucket();
+            this.isClosed = true;
+        }
     }
 
-    protected volatile AtomicInteger queue = new AtomicInteger(0);
+    protected class VectorDeallocator implements Deallocator {
+        protected final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
-    private AbstractBucket bufferBucket;
+        protected final long vectorAddress;
+        protected final long cacheAddress;
 
-    protected final int        bufferSize;
-    protected int              bucketSize;
-    protected final List<Long> bucketAddress = new ArrayList<>();
+        protected boolean isClosed = false;
 
-    protected Vector(int bufferSize, int bucketSize) throws NativeException {
+        protected VectorDeallocator(long vAddress, long cAddress) {
+            this.vectorAddress = vAddress;
+            this.cacheAddress  = cAddress;
+        }
+
+        @Override
+        public void clean() {
+            if (this.isClosed) {
+                return;
+            }
+
+            this.isClosed = true;
+            this.synchronizer.shutdown();
+
+        }
+    }
+
+    protected int indexPointer = 0;
+
+    protected final int cacheSize;
+
+    protected Vector(int cacheSize) throws NativeException {
         if (e != null) {
             throw e;
         }
 
-        this.bufferSize = bufferSize;
-        this.bucketSize = bucketSize;
-
-        AbstractBucket first = newBucket(bufferSize);
-
-        AbstractBucket bucket = first;
-        for (int i = 1; i < bucketSize; i++) {
-            bucket = bucket.setNext(newBucket(bufferSize));
-        }
-
-        this.bufferBucket = bucket.setNext(first);
-    }
-
-    public void flush() {
-        this.bufferBucket.flush();
-        waitAll();
-    }
-
-    public void waitAll() {
-        this.bufferBucket.waitBucket();
-
-        AbstractBucket bucket = this.bufferBucket.next;
-        while (!this.bufferBucket.equals(bucket)) {
-            bucket.waitBucket();
-            bucket = bucket.next;
-        }
-    }
-
-    @Override
-    public Iterator<T> iterator() {
-        waitAll();
-
-        // Fetch initial data first
-        int size    = size();
-        int offset_ = size > this.bufferSize ? this.bufferSize : size;
-
-        this.bufferBucket.fetch(0, offset_);
-
-        return new Iterator<>() {
-            int offset = offset_;
-
-            final int      bufferSize = Vector.this.bufferSize;
-            AbstractBucket buck       = Vector.this.bufferBucket;
-
-            @Override
-            public T next() {
-                // this.buck.waitBucket();
-
-                Number value = this.buck.getStorageValue();
-
-                if (this.buck.indexPointer == this.buck.size) {
-                    int begin = this.offset;
-                    this.offset += this.bufferSize;
-
-                    if (this.offset >= size) {
-                        this.buck.fetch(begin, size);
-                    }
-                    else {
-                        this.buck.fetch(begin, this.offset);
-                    }
-
-                    // this.buck = this.buck.next;
-                }
-
-                return convert(value);
-            }
-
-            @Override
-            public boolean hasNext() {
-                return this.buck.indexPointer < this.buck.size;
-            }
-        };
-    }
-
-    @Override
-    public boolean add(T e) {
-        this.bufferBucket = this.bufferBucket.addIncr(e);
-        return true;
+        this.cacheSize = cacheSize;
     }
 
     @Override
     public boolean addAll(Collection<? extends T> c) {
-        c.forEach(e -> add(e));
-        return true;
-    }
-
-    @Override
-    public boolean containsAll(Collection<?> c) {
-        for (Object e : c) {
-            if (!contains(e)) {
-                return false;
-            }
-        }
-
+        c.forEach(this::add);
         return true;
     }
 
     @Override
     public boolean isEmpty() { return size() == 0; }
 
-    @Override
-    public boolean removeAll(Collection<?> c) {
-        for (Object o : c) {
-            if (!remove(o)) {
-                return false;
-            }
+    public void flush() {
+        // Only perform if data is dirty (modified, not synchronized)
+        if (this.indexPointer > 0) {
+            sync();
         }
-
-        return true;
     }
 
     // -----=======~~ Abstract ~~~=======-----
-    protected abstract T convert(Number n);
-    protected abstract ExecutorService getSynchronizer();
-    protected abstract AbstractBucket newBucket(int size);
+    protected abstract void fetch(long address, int from, int to);
+    protected abstract void sync();
 
     // -----======= Not Supported =======-----
 
-    /**
-     * Not supported due to performance issue
-     */
+    @Override
+    @Deprecated
+    public boolean addAll(int index, Collection<? extends T> c) {
+        throw new UnsupportedOperationException("Not supported due to performance issue");
+    }
+
+    @Override
+    @Deprecated
+    public void add(int index, T element) {
+        throw new UnsupportedOperationException("Not supported due to performance issue");
+    }
+
+    @Override
+    @Deprecated
+    public ListIterator<T> listIterator() {
+        throw new UnsupportedOperationException("Not supported due to memory efficiency and performance issue");
+    }
+
+    @Override
+    @Deprecated
+    public ListIterator<T> listIterator(int index) {
+        throw new UnsupportedOperationException("Not supported due to memory efficiency and performance issue");
+    }
+
+    @Override
+    @Deprecated
+    public List<T> subList(int fromIndex, int toIndex) {
+        throw new UnsupportedOperationException("Not supported due to memory efficiency");
+    }
+
     @Override
     @Deprecated
     public boolean retainAll(Collection<?> c) {
-        throw new UnsupportedOperationException("Not supported");
+        throw new UnsupportedOperationException("Not supported due to performance issue");
     }
 
-    /**
-     * Not supported due to performance issue
-     */
     @Override
     @Deprecated
     public final Object[] toArray() {
-        throw new UnsupportedOperationException("Not supported");
+        throw new UnsupportedOperationException("Not supported due to memory efficiency");
     }
 
-    /**
-     * Not supported due to performance issue
-     */
     @Override
     @Deprecated
     @SuppressWarnings("hiding")
     public final <T> T[] toArray(T[] a) {
-        throw new UnsupportedOperationException("Not supported");
+        throw new UnsupportedOperationException("Not supported due to memory efficiency");
     }
 }
