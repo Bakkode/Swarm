@@ -40,31 +40,39 @@ JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVecto
 }
 
 JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync
-(JNIEnv* env, jclass, jlong ptr, jlong source, jint to, jfloat incrPolicy) {
+(JNIEnv* env, jclass, jlong ptr, jlong source, jlong to, jfloat incrPolicy) {
     std::vector<float_t>* vec = reinterpret_cast<std::vector<float_t>*>(ptr);
 
-    if (vec->capacity() - vec->size() < to) {
-        size_t newSize = static_cast<size_t>(vec->capacity() * incrPolicy);
-        vec->reserve(newSize);
-    }
+    //if (vec->capacity() - vec->size() < to) {
+    //    size_t newSize = static_cast<size_t>(vec->capacity() * incrPolicy);
+    //    vec->reserve(newSize);
+    //}
 
-    jfloatArray* nativeStorage = reinterpret_cast<jfloatArray*>(source);
+    /*jfloatArray* nativeStorage = reinterpret_cast<jfloatArray*>(source);
     jfloat* elements = (jfloat*)env->GetPrimitiveArrayCritical(*nativeStorage, NULL);
     vec->insert(vec->end(), elements, elements + to);
 
-    env->ReleasePrimitiveArrayCritical(*nativeStorage, elements, JNI_ABORT);   
+    env->ReleasePrimitiveArrayCritical(*nativeStorage, elements, JNI_ABORT);   */
+
+    float* lBound = reinterpret_cast<float*>(source);
+    float* uBound = reinterpret_cast<float*>(to);
+    vec->insert(vec->end(), lBound, uBound);
 }
 
-JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Fetch(JNIEnv* env, jclass, jlong ptr, jlong dest, jint from, jint to) {
+JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Fetch
+(JNIEnv* env, jclass, jlong ptr, jlong dest, jint from, jint to) {
     std::vector<float_t>* vec = reinterpret_cast<std::vector<float_t>*>(ptr);
 
-    jint length = to - from + 1;
-    jfloatArray* nativeStorage = reinterpret_cast<jfloatArray*>(dest);
+    jint length = to - from;
+   /* jfloatArray* nativeStorage = reinterpret_cast<jfloatArray*>(dest);
 
     jfloat* elements = reinterpret_cast<jfloat*>(env->GetPrimitiveArrayCritical(*nativeStorage, NULL));
     std::memcpy(elements, &(*vec)[from], length * sizeof(float_t));
 
-    env->ReleasePrimitiveArrayCritical(*nativeStorage, elements, 0);
+    env->ReleasePrimitiveArrayCritical(*nativeStorage, elements, 0);*/
+
+    float* elements = reinterpret_cast<float*>(dest);
+    std::memcpy(elements, &(*vec)[from], length * sizeof(float_t));
 }
 
 JNIEXPORT jfloat JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32GetByIndex(JNIEnv*, jclass, jlong ptr, jint index) {

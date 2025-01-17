@@ -53,7 +53,7 @@ extern "C" {
 	 * Signature: (JJIIF)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_runtime_datatype_FloatVector_fp32Sync
-	(JNIEnv*, jclass, jlong, jlong, jint, jfloat);
+	(JNIEnv*, jclass, jlong, jlong, jlong, jfloat);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_runtime_datatype_FloatVector

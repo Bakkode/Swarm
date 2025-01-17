@@ -1,15 +1,18 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
 import java.util.Collection;
-import java.util.Iterator;
 
 import io.github.seal139.jSwarm.core.NativeCleaner;
-import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.core.NativeException;
 
 public final class FloatVector extends Vector<Float> {
 
-    private class FloatCacheDeallocator extends CacheDeallocator {
+    @Override
+    protected int size_t() {
+        return 4;
+    }
+
+    private static class FloatCacheDeallocator extends CacheDeallocator {
         boolean cleaned = false;
 
         protected FloatCacheDeallocator(long address) {
@@ -23,78 +26,13 @@ public final class FloatVector extends Vector<Float> {
             }
 
             this.cleaned = true;
-            fp32Unhook(this.address);
+            unhook(this.address);
         }
-    }
-
-    private final class Iter implements Iterator<Float>, NativeResources {
-        protected final int     size          = size();
-        protected final int     iterCacheSize = FloatVector.this.cacheSize;
-        protected final float[] cache         = new float[this.iterCacheSize];
-        protected final long    iterCacheAddress;
-
-        protected int indexPointer = 0;
-
-        protected int offset      = this.size > this.iterCacheSize ? this.iterCacheSize : this.size;
-        protected int fetchedSize = this.offset;
-
-        private final CacheDeallocator deallocator;
-
-        protected Iter() {
-            this.iterCacheAddress = fp32Hook(this.cache);
-            fetch(this.iterCacheAddress, 0, this.offset);
-
-            this.deallocator = new FloatCacheDeallocator(this.iterCacheAddress);
-
-            NativeCleaner.register(this);
-        }
-
-        @Override
-        public Float next() {
-            Number value = this.cache[this.indexPointer++];
-
-            if ((this.indexPointer == this.iterCacheSize) && (this.offset < this.size)) {
-                this.indexPointer = 0;
-                int begin = this.offset;
-                this.offset += this.iterCacheSize;
-
-                if (this.offset >= this.size) {
-                    fetch(this.iterCacheAddress, begin, this.size);
-                    this.fetchedSize = this.size - begin;
-
-                    // Release native resources as there's no object
-                    // left to be fetched
-                    this.deallocator.clean();
-                }
-                else {
-                    fetch(this.iterCacheAddress, begin, this.offset);
-                    this.fetchedSize = this.offset - begin;
-                }
-            }
-
-            return value.floatValue();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return this.indexPointer < this.fetchedSize;
-        }
-
-        @Override
-        public void close() throws Exception {
-            this.deallocator.clean();
-        }
-
-        @Override
-        public Deallocator getDeallocator() { return this.deallocator; }
-
-        @Override
-        public boolean isClosed() { return this.deallocator.isClosed; }
     }
 
     @Override
-    public Iterator<Float> iterator() {
-        return new Iter();
+    protected CacheDeallocator getCDealloc(long addr) {
+        return new FloatCacheDeallocator(addr);
     }
 
     private final class FloatDeallocator extends VectorDeallocator {
@@ -107,16 +45,13 @@ public final class FloatVector extends Vector<Float> {
             super.clean();
 
             fp32Delete(this.vectorAddress);
-            fp32Unhook(this.cacheAddress);
+            unhook(this.cacheAddress);
         }
     }
 
     // ============ Allocator - Deallocator ==================
 
     private final VectorDeallocator deallocator;
-
-    // Cache (Concurrent)
-    private final float[] cache;
 
     private final long vectorAddress;
     private final long cacheAddress;
@@ -131,22 +66,32 @@ public final class FloatVector extends Vector<Float> {
 
     public FloatVector() throws NativeException {
         this(DEF_INIT_SIZE, DEF_CACHE_SIZE);
-
     }
 
     public FloatVector(int initial) throws NativeException {
         this(initial, (initial < DEF_CACHE_SIZE) ? initial : DEF_CACHE_SIZE);
     }
 
+    private final long ubnd;
+
     public FloatVector(int initial, int cacheSize) throws NativeException {
         super(cacheSize);
 
-        this.cache         = new float[cacheSize];
         this.vectorAddress = fp32Construct(initial);
-        this.cacheAddress  = fp32Hook(this.cache);
+        this.cacheAddress  = hook(this.cacheSize);
+
+        this.unsafePtr = this.cacheAddress;
+        this.ubnd      = this.cacheAddress + this.cacheSize;
 
         this.deallocator = new FloatDeallocator(this.vectorAddress, this.cacheAddress);
         NativeCleaner.register(this);
+    }
+
+    @Override
+    public void flush() {
+        if (this.unsafePtr > this.cacheAddress) {
+            sync();
+        }
     }
 
     @Override
@@ -161,9 +106,10 @@ public final class FloatVector extends Vector<Float> {
 
     @Override
     public boolean add(Float e) {
-        this.cache[this.indexPointer++] = e;
+        UNSAFE.putFloat(this.unsafePtr, e.floatValue());
+        this.unsafePtr += 4;
 
-        if (this.indexPointer == this.cacheSize) {
+        if (this.unsafePtr == this.ubnd) {
             sync();
         }
 
@@ -171,14 +117,19 @@ public final class FloatVector extends Vector<Float> {
     }
 
     @Override
+    protected Float convert(Number num) {
+        return num.floatValue();
+    }
+
+    @Override
     public void sync() {
-        fp32Sync(this.vectorAddress, this.cacheAddress, this.indexPointer, 2f);
-        this.indexPointer = 0;
+        fp32Sync(this.vectorAddress, this.cacheAddress, this.unsafePtr, 2f);
+        this.unsafePtr = this.cacheAddress;
     }
 
     @Override
     protected void fetch(long cacheAddress, int from, int to) {
-        fp32Fetch(this.vectorAddress, cacheAddress, from, to - 1);
+        fp32Fetch(this.vectorAddress, cacheAddress, from, to);
     }
 
     @Override
@@ -252,16 +203,16 @@ public final class FloatVector extends Vector<Float> {
 
     // -----======= Native Operation =======-----
 
-    private static native long fp32Hook(float[] src); // Hook cache-array to native side
-    private static native void fp32Unhook(long address); // Unhok cache-array
+    private static native long fp32Hook_(float[] src); // Hook cache-array to native side
+    private static native void fp32Unhook_(long address); // Unhook cache-array
 
     private static native long fp32Construct(int cacheSize); // Create Vector
     private static native void fp32Delete(long address); // Deallocate Vector
 
     private static native int fp32GetSize(long address); // Get the size of Vector
 
-    private static native void fp32Sync(long address, long bufferAddress, int size, float resizePolicy); // [i, x) Synchronize data from cache to
-                                                                                                         // Vector
+    private static native void fp32Sync(long address, long bufferAddress, long size, float resizePolicy); // [i, x) Synchronize data from cache to
+                                                                                                          // Vector
     private static native void fp32Fetch(long address, long bufferAddress, int begin, int to); // [i, x) Synchronize data from Vector to cache
 
     private static native boolean fp32ContainsAll(long address, float[] nums); // Is this Vector contains all the specified value?
@@ -276,4 +227,5 @@ public final class FloatVector extends Vector<Float> {
     private static native float fp32Set(long address, int index, float value); // Set value at specified index
 
     private static native void fp32Clear(long address); // Clear vector entirely
+
 }

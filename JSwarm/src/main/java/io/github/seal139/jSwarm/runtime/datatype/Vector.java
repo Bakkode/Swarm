@@ -1,13 +1,17 @@
 package io.github.seal139.jSwarm.runtime.datatype;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import io.github.seal139.jSwarm.core.NativeCleaner;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.core.NativeException;
+import sun.misc.Unsafe;
 
 /**
  * Provide as huge data chunk for parallel process. The purpose of this class it
@@ -64,25 +68,44 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     // overlap, no race condition is guaranteed
 
     private static final NativeException e;
+
+    protected static final sun.misc.Unsafe UNSAFE;
+
+    protected static long hook(int size) {
+        return UNSAFE.allocateMemory(size);
+    }
+
+    protected static void unhook(long address) {
+        UNSAFE.freeMemory(address);
+    }
+
     static {
-        Throwable le;
+        Throwable       le;
+        sun.misc.Unsafe u;
         try {
             System.load("C:\\wsl\\Programming\\Swarm\\C\\vector\\out\\build\\x64-release\\Vector.dll");
             le = null;
+
+            Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            unsafeField.setAccessible(true);
+            u = (Unsafe) unsafeField.get(null);
         }
         catch (Throwable e) {
             le = e;
+            u  = null;
         }
 
         if (le != null) {
-            e = new NativeException(le);
+            e      = new NativeException(le);
+            UNSAFE = null;
         }
         else {
-            e = null;
+            e      = null;
+            UNSAFE = u;
         }
     }
 
-    protected abstract class CacheDeallocator implements Deallocator {
+    protected static abstract class CacheDeallocator implements Deallocator {
         protected final long address;
         protected boolean    isClosed = false;
 
@@ -100,7 +123,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         }
     }
 
-    protected class VectorDeallocator implements Deallocator {
+    protected abstract class VectorDeallocator implements Deallocator {
         protected final ExecutorService synchronizer = Executors.newSingleThreadExecutor();
 
         protected final long vectorAddress;
@@ -125,7 +148,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         }
     }
 
-    protected int indexPointer = 0;
+    protected long unsafePtr;
 
     protected final int cacheSize;
 
@@ -134,7 +157,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
             throw e;
         }
 
-        this.cacheSize = cacheSize;
+        this.cacheSize = 4 * cacheSize;
     }
 
     @Override
@@ -146,16 +169,86 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     @Override
     public boolean isEmpty() { return size() == 0; }
 
-    public void flush() {
-        // Only perform if data is dirty (modified, not synchronized)
-        if (this.indexPointer > 0) {
-            sync();
+    public abstract void flush();
+
+    private final class Iter implements Iterator<T>, NativeResources {
+        private final long iterCacheAddress;
+        private final long uBound;
+
+        private long unsafePtr;
+        private long fetchedSize;
+
+        private final int sz   = size_t();
+        private final int size = size();
+
+        private final int iterCacheSize = Vector.this.cacheSize;
+        private int       offset        = this.size > this.iterCacheSize ? this.iterCacheSize : this.size;
+
+        private final CacheDeallocator deallocator;
+
+        protected Iter() {
+            final int unsafeCacheSize = this.sz * this.iterCacheSize;
+
+            this.iterCacheAddress = hook(unsafeCacheSize);
+
+            this.unsafePtr    = this.iterCacheAddress;
+            this.uBound       = this.iterCacheAddress + unsafeCacheSize;
+            this.fetchedSize += this.iterCacheAddress + unsafeCacheSize;
+
+            fetch(this.iterCacheAddress, 0, this.offset);
+
+            this.deallocator = getCDealloc(this.iterCacheAddress);
+            NativeCleaner.register(this);
         }
+
+        @Override
+        public T next() {
+            Number value = UNSAFE.getFloat(this.unsafePtr);
+            this.unsafePtr += this.sz;
+
+            if ((this.unsafePtr == this.uBound) && (this.offset < this.size)) {
+                this.unsafePtr = this.iterCacheAddress;
+
+                int begin = this.offset;
+                this.offset += this.iterCacheSize;
+
+                int b = this.offset >= this.size ? this.size : this.offset;
+
+                fetch(this.iterCacheAddress, begin, b);
+                this.fetchedSize = (this.sz * (b - begin)) + this.iterCacheAddress;
+            }
+
+            return convert(value);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return this.unsafePtr < this.fetchedSize;
+        }
+
+        @Override
+        public void close() throws Exception {
+            this.deallocator.clean();
+        }
+
+        @Override
+        public Deallocator getDeallocator() { return this.deallocator; }
+
+        @Override
+        public boolean isClosed() { return this.deallocator.isClosed; }
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+        return new Iter();
     }
 
     // -----=======~~ Abstract ~~~=======-----
     protected abstract void fetch(long address, int from, int to);
+    protected abstract T convert(Number num);
     protected abstract void sync();
+    protected abstract int size_t();
+    protected abstract CacheDeallocator getCDealloc(long addr);
 
     // -----======= Not Supported =======-----
 
