@@ -5,17 +5,21 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import sun.misc.Unsafe;
+
 public final class Common {
     private static final ForkJoinPool w = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
 
-    private static final String  osName;
-    private static final boolean debug;
+    private static final String          osName;
+    private static final boolean         debug;
+    private static final sun.misc.Unsafe memory;
 
     static {
         /* Check OS */ {
@@ -45,7 +49,26 @@ public final class Common {
 
             debug = d;
         }
+
+        /* Load Unsafe instance for native memory access */ {
+            sun.misc.Unsafe u = null;
+
+            Field unsafeField;
+            try {
+                unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+                unsafeField.setAccessible(true);
+                u = (Unsafe) unsafeField.get(null);
+            }
+            catch (Throwable e) {
+                u = null;
+            }
+            finally {
+                memory = u;
+            }
+        }
     }
+
+    public static sun.misc.Unsafe getMemoryManagement() { return memory; }
 
     public static <T> Future<T> queue(Callable<T> task) {
         return w.submit(task);
