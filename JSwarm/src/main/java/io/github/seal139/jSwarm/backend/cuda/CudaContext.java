@@ -1,148 +1,325 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.Kernel;
 import io.github.seal139.jSwarm.core.Module;
+import io.github.seal139.jSwarm.core.NativeCleaner;
+import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.core.NdRange;
 import io.github.seal139.jSwarm.core.Program;
+import io.github.seal139.jSwarm.core.SwarmException;
 import io.github.seal139.jSwarm.core.SyncDirection;
-import io.github.seal139.jSwarm.runtime.datatype.Vector;
+import io.github.seal139.jSwarm.datatype.Vector;
+import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.misc.Log;
+import sun.misc.Unsafe;
 
 public class CudaContext implements Context {
 
-    private final long address;
-    private long       queueAddress;
-    private int        queueSize;
-    private int        queueIdx;
+    static final class DeallocatorImpl implements Deallocator {
+        private final List<Deallocator> moduleDec = new ArrayList<>();
 
-    private boolean closed = false;
+        private boolean    isClosed = false;
+        private final long address;
 
-    public long getAddress() { return address; }
+        private final List<Long> queueAddress = new ArrayList<>();
 
-    CudaContext(long device) throws CudaException {
-        long[] r = CudaDriver.cudaInitDefault(device);
+        private int queueSize;
 
-        if (r[0] != 0l) {
-            throw new CudaException(r[0]);
+        private DeallocatorImpl(long address) {
+            this.address = address;
         }
 
-        address      = r[1];
-        queueAddress = r[2];
-        queueSize    = 4;
-        queueIdx     = 0;
+        @Override
+        public void clean() {
+            // Delete module and it's corresponding kernel
+            this.moduleDec.forEach(Deallocator::clean);
+
+            // Delete queue (stream)
+            long[] addr = new long[this.queueSize];
+            for (int i = 0; i < this.queueSize; i++) {
+                addr[i] = this.queueAddress.get(i).longValue();
+            }
+
+            int r1 = CudaDriver.cudaDeleteQueue(this.address, addr, this.queueSize);
+            if (r1 != 0L) {
+                Log.error(new CudaException(r1));
+            }
+
+            // Delete this object (context)
+            int r2 = CudaDriver.cudaDeleteContext(this.address);
+            if (r2 != 0L) {
+                Log.error(new CudaException(r2));
+            }
+
+            this.isClosed = true;
+        }
     }
 
-    boolean isClosed() { return closed; }
+    // ============ Allocator - Deallocator ==================
+
+    private final DeallocatorImpl deallocator;
+
+    @Override
+    public Deallocator getDeallocator() { return this.deallocator; }
+
+    CudaContext(CudaDevice device) throws CudaException {
+        final Unsafe mem = Common.getMemoryManagement();
+
+        final int  deviceId = device.getDeviceId();
+        final long intptr   = CudaDriver.cudaCreateContext(deviceId);
+
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new CudaException(errorCode);
+        }
+
+        this.deallocator = new DeallocatorImpl(mem.getLong(intptr + 8));
+
+        // By default, creating context will include 4 stream queue. this is useful for
+        // concurrent data transfer
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 16));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 24));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 32));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 40));
+        this.deallocator.queueSize = 4;
+        this.queueIdx              = 0;
+
+        // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
+        NativeCleaner.register(this);
+    }
 
     @Override
     public void close() throws Exception {
-        if (closed) {
-            return;
+        this.deallocator.clean();
+    }
+
+    @Override
+    public boolean isClosed() { return this.deallocator.isClosed; }
+
+    // ============ Functionality Operation ==================
+
+    private int queueIdx;
+
+    @Override
+    public int getParallelismLevel() { return this.deallocator.queueSize; }
+
+    @Override
+    public void addParallelismLevel(int additionalNumber) throws CudaException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
         }
 
-        CudaDriver.cudaDeleteQueue(queueAddress, queueSize);
-        CudaDriver.cudaDeleteContext(address);
+        final Unsafe mem    = Common.getMemoryManagement();
+        final long   intptr = CudaDriver.cudaAddQueue(getAddress(), additionalNumber);
 
-        closed = true;
-    }
-
-    @Override
-    public int getParallelismLevel() { return queueSize; }
-
-    @Override
-    public void addParallelismLevel(int additionalNumber) throws CudaException {
-        long[] r = CudaDriver.cudaCreateQueue(queueAddress, queueSize, additionalNumber);
-
-        if (r[0] != 0l) {
-            throw new CudaException(r[0]);
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new CudaException(errorCode);
         }
 
-        queueAddress  = r[1];
-        queueSize    += additionalNumber;
+        this.deallocator.queueSize += additionalNumber;
+
+        long lBound = intptr + 8;
+        long uBound = lBound + (8 * additionalNumber);
+
+        for (long queuePtr = lBound; queuePtr < uBound; queuePtr += 8) {
+            this.deallocator.queueAddress.add(mem.getLong(queuePtr));
+        }
+
+        // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
     }
 
     @Override
-    public Module loadProgram(Class<? extends Program> program) {
-        // TODO Auto-generated method stub
-        return null;
+    public Module loadProgram(Class<? extends Program> program) throws SwarmException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
+
+        String src = "";
+        return loadProgram(src);
     }
 
     @Override
-    public Module loadProgram(Class<? extends Program>... programs) {
-        // TODO Auto-generated method stub
-        return null;
+    @SuppressWarnings("unchecked")
+    public Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
+
+        String src = "";
+        return loadProgram(src);
     }
 
     @Override
-    public Module loadProgram(Collection<Class<? extends Program>> programs) {
-        // TODO Auto-generated method stub
-        return null;
+    public Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
+
+        String src = "";
+        return loadProgram(src);
     }
 
     @Override
-    public Module loadProgram(String program) {
+    public Module loadProgram(String program) throws SwarmException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
 
-        // TODO Auto-generated method stub
-        return null;
+        return new CudaModule(this, program);
     }
 
     @Override
-    public void launch(CudaKernel kernel) {
-
-        // TODO Auto-generated method stub
-
-        // waitOperation();
+    @SuppressWarnings("unchecked")
+    public void launch(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+        launchAsync(kernel, ndRange, arguments);
+        waitOperation();
     }
 
     @Override
-	public void launchAsync(Kernel kernel) {
-		CudaDriver.cudaLaunch(address, address, queueAddress, queueIdx, address, address, address, address, queueSize, queueIdx, queueAddress, address)
-	}
+    @SuppressWarnings("unchecked")
+    public void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+        long[] args = new long[arguments.length];
+
+        {
+            final int size = arguments.length;
+            for (int i = 0; i < size; i++) {
+                args[i] = arguments[i].getBufferAddress(this);
+            }
+
+        }
+
+        CudaDriver.cudaLaunch(getAddress(), ((CudaKernel) kernel).getAddress(), hitQueueIndex(), //
+                ndRange.getXGlobal(), ndRange.getYGlobal(), ndRange.getZGlobal(), //
+                ndRange.getXlocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
+                args, args.length);
+    }
+
+    // ==== buffer memory management ====
 
     @Override
-    public void launch(Kernel kernel, int allocatedSharedMemory) {
-        // TODO Auto-generated method stub
+    public void hook(Vector<? extends Number> vector) throws CudaException {
+        final Unsafe mem = Common.getMemoryManagement();
 
-        // waitOperation();
+        long intptr = CudaDriver.cudaHook(getAddress(), vector.longSize() * vector.getValueSize());
+
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new CudaException(errorCode);
+        }
+
+        vector.setBuffer(this, mem.getLong(intptr + 8));
+
+        // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
     }
 
     @Override
-    public void launchAsync(Kernel kernel, int allocatedSharedMemory) {
-        // TODO Auto-generated method stub
+    @SuppressWarnings("unchecked")
+    public void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws CudaException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
 
-    }
+        final long contextAddress = getAddress();
 
-    @Override
-    public void sync(SyncDirection direction, Vector<?>... dataCollection) {
-        if (direction.equals(SyncDirection.TO_DEVICE)) {
+        if (SyncDirection.TO_DEVICE.equals(direction)) {
             for (Vector<?> vec : dataCollection) {
-                CudaDriver.cudaSyncDataTo(this.address, this.queueAddress, getQueueIndex(), vec.getAddress(), vec.getNativeSize());
+                int errorCode = CudaDriver.cudaSyncDataTo(contextAddress, hitQueueIndex(), //
+                        vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
+
+                if (errorCode != 0) {
+                    throw new CudaException(errorCode);
+                }
             }
         }
-        else {
-            for (Vector<?> vec : dataCollection) {
-                CudaDriver.cudaSyncDataFrom(this.queueAddress, getQueueIndex(), vec.getAddress(), vec.getContextAddress(this), vec.getNativeSize());
+
+        for (Vector<?> vec : dataCollection) {
+            int errorCode = CudaDriver.cudaSyncDataFrom(contextAddress, hitQueueIndex(), //
+                    vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
+
+            if (errorCode != 0) {
+                throw new CudaException(errorCode);
             }
         }
     }
 
     @Override
-    public void waitOperation() throws CudaException {
-        long r = CudaDriver.cudaWaitAll(queueAddress, queueSize);
-        if (r != 0l) {
-            throw new CudaException(r);
+    public void unhook(Vector<? extends Number> vector) throws CudaException {
+        int errorCode = CudaDriver.cudaUnhook(getAddress(), vector.getBufferAddress(this));
+        if (errorCode != 0) {
+            throw new CudaException(errorCode);
         }
 
+        vector.removeBuffer(this);
     }
 
-    protected int getQueueIndex() {
-        int i = queueIdx++;
-        if (queueIdx == queueSize) {
-            queueIdx = 0;
+    @Override
+    public void reHook(Vector<? extends Number> vector) throws CudaException {
+        int errorCode = CudaDriver.cudaUnhook(getAddress(), vector.getBufferAddress(this));
+        if (errorCode != 0) {
+            throw new CudaException(errorCode);
         }
 
-        return i;
+        hook(vector);
+    }
+    // ==== Fence ====
+
+    @Override
+    public void waitOperation() throws CudaException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
+        }
+
+        // Delete queue (stream)
+        long[] addr = new long[this.deallocator.queueSize];
+        for (int i = 0; i < this.deallocator.queueSize; i++) {
+            addr[i] = this.deallocator.queueAddress.get(i).longValue();
+        }
+
+        int errorCode = CudaDriver.cudaWaitAll(getAddress());
+        if (errorCode != 0) {
+            throw new CudaException(errorCode);
+        }
     }
 
+    // ==== ====
+
+    protected long hitQueueIndex() {
+        if (this.queueIdx == this.deallocator.queueSize) {
+            this.queueIdx = 0;
+        }
+
+        return this.deallocator.queueAddress.get(this.queueIdx++);
+    }
+
+    // =============== Object Operation ======================
+
+    long getAddress() { return this.deallocator.address; }
+
+    @Override
+    public int hashCode() {
+        // Use native memory address instead
+        return (int) getAddress();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return (obj.hashCode() == hashCode() //
+        ) && (obj instanceof CudaContext //
+        ) && (((CudaModule) obj).getAddress() == getAddress());
+    }
 }

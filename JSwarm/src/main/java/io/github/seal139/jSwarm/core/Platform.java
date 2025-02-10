@@ -1,17 +1,10 @@
 package io.github.seal139.jSwarm.core;
 
-import io.github.seal139.jSwarm.backend.cuda.CudaException;
-
 /**
  * Represent platform driver. This is the low level implementation that
  * communicate directly with runtime environment
  */
 public interface Platform {
-
-    /**
-     * Init resource and configuration
-     */
-    void init() throws CudaException;
 
     /**
      * Get short name as identifier. This name should be unique.
@@ -22,7 +15,7 @@ public interface Platform {
 
     /**
      * Get full driver name.
-     * 
+     *
      * @return Driver name.
      */
     String getFullName();
@@ -32,14 +25,14 @@ public interface Platform {
      * performance. This method is used to differ preferable and fallback platform.
      * In case of Device is appear in multiple platform, an {@link Executor} object
      * for the same device from primary platform will showed up first.
-     * 
+     *
      * @return True when this driver is marked as 'preferable' platform
      */
     boolean isPrimary();
 
     /**
      * Get platform version
-     * 
+     *
      * @return Platform version
      */
     String getVersion();

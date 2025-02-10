@@ -1,92 +1,115 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import io.github.seal139.jSwarm.core.Log;
 import io.github.seal139.jSwarm.core.Module;
 import io.github.seal139.jSwarm.core.NativeCleaner;
+import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.misc.Log;
+import sun.misc.Unsafe;
+
+// Status: Development done
 
 public class CudaModule implements Module {
 
     static final class DeallocatorImpl implements Deallocator {
-        private final long       address;
-        private final List<Long> kernelAddress = new ArrayList<>();
+        private final long address;
+        private final long ctxAddress;
 
-        private DeallocatorImpl(long address) {
-            this.address = address;
+        private boolean isClosed = false;
+
+        private DeallocatorImpl(long address, long ctxAddress) {
+            this.address    = address;
+            this.ctxAddress = ctxAddress;
         }
 
         @Override
         public void clean() {
-            long[] addr = new long[kernelAddress.size()];
-            for (int i = 0; i < kernelAddress.size(); i++) {
-                addr[i] = kernelAddress.get(i).longValue();
+            if (this.isClosed) {
+                return;
             }
 
-            long r1 = CudaDriver.cudaDeleteKernel(addr, kernelAddress.size());
-            if (r1 != 0l) {
-                Log.error(new CudaException(r1));
-            }
-
-            long r2 = CudaDriver.cudaDeleteProgram(address);
-            if (r2 != 0l) {
+            int r2 = CudaDriver.cudaDeleteProgram(this.ctxAddress, this.address);
+            if (r2 != 0) {
                 Log.error(new CudaException(r2));
             }
+
+            this.isClosed = true;
         }
     }
 
-    private final DeallocatorImpl         deallocator;
-    private final Map<String, CudaKernel> kernelMap = new HashMap<>();
+    // ============ Allocator - Deallocator ==================
+
+    private final DeallocatorImpl deallocator;
 
     @Override
-    public Deallocator getDeallocator() { return deallocator; }
+    public Deallocator getDeallocator() { return this.deallocator; }
+
+    private final CudaContext ctx;
 
     CudaModule(CudaContext ctx, String source) throws CudaException {
-        long[] r = CudaDriver.cudaCreateProgram(ctx.getAddress(), source);
+        final Unsafe mem = Common.getMemoryManagement();
 
-        if (r[0] != 0l) {
-            throw new CudaException(r[0]);
+        final long intptr = CudaDriver.cudaCreateProgram(ctx.getAddress(), source);
+
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new CudaException(errorCode);
         }
 
-        deallocator = new DeallocatorImpl(r[1]);
+        this.ctx = ctx;
+
+        this.deallocator = new DeallocatorImpl(mem.getLong(intptr + 8), ctx.getAddress());
+
+        // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
         NativeCleaner.register(this);
     }
 
-    long getAddress() { return deallocator.address; }
-
     @Override
     public void close() throws Exception {
-        deallocator.clean();
+        this.deallocator.clean();
     }
 
     @Override
-    public CudaKernel getKernel(String kernelName) throws CudaException {
-        CudaKernel kernel = kernelMap.get(kernelName);
-        if (kernel != null) {
-            return kernel;
+    public boolean isClosed() { return this.deallocator.isClosed; }
+
+    // ============ Functionality Operation ==================
+
+    private final Map<String, CudaKernel> kernelMap = new HashMap<>();
+
+    @Override
+    public CudaKernel getKernel(String kernelName) throws CudaException, DeallocatedException {
+        if (isClosed()) {
+            throw new DeallocatedException();
         }
 
-        kernel = new CudaKernel(this, kernelName);
-        deallocator.kernelAddress.add(kernel.getAddress());
-
-        kernelMap.put(kernelName, kernel);
+        CudaKernel kernel = this.kernelMap.get(kernelName);
+        if (kernel == null) {
+            kernel = new CudaKernel(this.ctx, this, kernelName);
+            this.kernelMap.put(kernelName, kernel);
+        }
 
         return kernel;
     }
 
-    // =================================================================================
+    // =============== Object Operation ======================
+
+    long getAddress() { return this.deallocator.address; }
 
     @Override
     public int hashCode() {
-        // Use native memory address instead
         return (int) getAddress();
     }
 
     @Override
     public boolean equals(Object obj) {
-        return obj.hashCode() == hashCode() && obj instanceof CudaModule && ((CudaModule) obj).getAddress() == getAddress();
+        return (obj.hashCode() == hashCode() //
+        ) && (obj instanceof CudaModule //
+        ) && (((CudaModule) obj).getAddress() == getAddress());
     }
 }

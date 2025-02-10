@@ -29,11 +29,11 @@ public abstract class Decompiler {
      */
     private static final class Default extends Decompiler {
 
-        private final class Cfr implements OutputSinkFactory {
+        private static final class Cfr implements OutputSinkFactory {
 
             private final StringBuilder ret = new StringBuilder();
 
-            private final Sink<?> JavaSink = (t) -> ret.append(postProcess(t.toString()) + "\n\n");
+            private final Sink<?> JavaSink = t -> this.ret.append(postProcess(t.toString()) + "\n\n");
 
             private final Function<String, String> srcGen;
 
@@ -49,7 +49,7 @@ public abstract class Decompiler {
                         + "|" + "(.*\\bclass\\b.*\n)" // Remove --line 'class'
                         + "|" + "(.*\\bimplements\\b.*\n)" // Remove --line 'implements'
                         + "|" + "(\\bthis\\.\\b)" // Remove --word 'this'
-                        + "|" + "((?<=\\S|\\s)@\\S*\\s?)" // Remove --annotation
+                        // + "|" + "((?<=\\S|\\s)@\\S*\\s?)" // Remove --annotation
                         + "|" + "(\\bprotected\\b)" // Remove --word 'protected'
                         + "|" + "(\\bprivate\\b)" // Remove --word 'private'
                         + "|" + "(\\/\\*[\\s\\S]*?\\*\\/)" // Remove --comment
@@ -58,7 +58,7 @@ public abstract class Decompiler {
                 final StringBuilder sb = new StringBuilder();
 
                 for (String s : str) {
-                    cudaGenerator(sb, srcGen.apply(s));
+                    cudaGenerator(sb, this.srcGen.apply(s));
                 }
 
                 return sb.toString();
@@ -73,20 +73,20 @@ public abstract class Decompiler {
             @SuppressWarnings("unchecked")
             public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
                 // Handle only JAVA output
-                return sinkType == SinkType.JAVA ? (Sink<T>) JavaSink : null;
+                return sinkType == SinkType.JAVA ? (Sink<T>) this.JavaSink : null;
             }
 
             @Override
             public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> available) {
-                if (sinkType == SinkType.JAVA && available.contains(SinkClass.STRING)) {
+                if ((sinkType == SinkType.JAVA) && available.contains(SinkClass.STRING)) {
                     return Collections.singletonList(SinkClass.STRING);
                 }
 
                 return Collections.emptyList();
             }
 
-            public String getResult() { return "//Decompiled with CFR 0.152.\n\n" + ret.toString(); }
-        };
+            public String getResult() { return "//Decompiled with CFR 0.152.\n\n" + this.ret.toString(); }
+        }
 
         // "(?<=__kernel__[^)]*\\(\\s*|,\\s*)"
 
@@ -143,7 +143,7 @@ public abstract class Decompiler {
      * Use CFR Java decompiler implementation <br/>
      * This is for proof of work and should be avoided as long as dedicated
      * decompiler for this specific purpose is available
-     * 
+     *
      * @return Default implementation (CFR Java Decompiler)
      */
     public static final Decompiler getDefault() { return new Default(); }

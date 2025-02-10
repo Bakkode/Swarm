@@ -1,5 +1,6 @@
 package io.github.seal139.jSwarm.core;
 
+import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 
 /**
@@ -13,5 +14,5 @@ public interface Module extends NativeResources {
      * @param kernelName Name of the {@link Kernel}.
      * @return {@link Kernel}.
      */
-    Kernel getKernel(String kernelName) throws SwarmException;
+    Kernel getKernel(String kernelName) throws SwarmException, DeallocatedException;
 }

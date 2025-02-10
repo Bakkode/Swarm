@@ -1,9 +1,13 @@
 package io.github.seal139.jSwarm.datatype;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
+import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.NativeCleaner;
 import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.misc.Common;
@@ -55,8 +59,16 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
     protected final VectorDeallocator deallocator;
 
-    protected Vector(long lBound, long uBound, long align) {
-        this.aligned = (lBound % align) == 0;
+    protected final long size_t;
+    protected final long bit_t;
+
+    public long getValueSize() { return this.size_t; }
+
+    protected Vector(long lBound, long uBound, long size_t, long bit_t) {
+        this.size_t = size_t;
+        this.bit_t  = bit_t;
+
+        this.aligned = (lBound % size_t) == 0;
         this.dynamic = false;
 
         this.lBound   = lBound;
@@ -66,9 +78,12 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         this.deallocator = null;
     }
 
-    protected Vector(long size, long size_t, boolean aligned) {
+    protected Vector(long size, boolean aligned, long size_t, long bit_t) {
         final long sz     = size * size_t;
         final long origin = memAlloc.allocateMemory(sz + (aligned ? (size_t - 1) : 0));
+
+        this.size_t = size_t;
+        this.bit_t  = bit_t;
 
         long modulo = aligned ? origin % size_t : 0L;
 
@@ -179,6 +194,16 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     }
 
     @Override
+    public Iterator<T> iterator() {
+        return listIterator(0);
+    }
+
+    @Override
+    public ListIterator<T> listIterator() {
+        return listIterator(0);
+    }
+
+    @Override
     @Deprecated
     public List<T> subList(int fromIndex, int toIndex) {
         return subList((long) fromIndex, (long) toIndex);
@@ -220,7 +245,6 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     // -----=======~~ Extension ~~~=======-----
     public abstract long longIndexOf(T element);
     public abstract long longLastIndexOf(T element);
-    public abstract long longSize();
 
     public abstract List<T> subList(long fromIndex, long toIndex);
 
@@ -228,7 +252,13 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     public abstract T set(long index, T element);
     public abstract T remove(long index);
 
-    public abstract long capacity();
+    public long longSize() {
+        return (this.indexPtr - this.lBound) >> this.bit_t;
+    }
+
+    public long capacity() {
+        return (this.uBound - this.lBound) >> this.bit_t;
+    }
 
     // -----======= Not Supported =======-----
     @Override
@@ -241,18 +271,6 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
     @Deprecated
     public void add(int index, T element) {
         throw new UnsupportedOperationException("Not supported due to performance issue");
-    }
-
-    @Override
-    @Deprecated
-    public ListIterator<T> listIterator() {
-        return listIterator(0);
-    }
-
-    @Override
-    @Deprecated
-    public ListIterator<T> listIterator(int index) {
-        throw new UnsupportedOperationException("Not supported due to memory efficiency and performance issue");
     }
 
     @Override
@@ -274,4 +292,19 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         throw new UnsupportedOperationException("Not supported due to memory efficiency");
     }
 
+    // ========= GPGPU Capabilities =========
+
+    private final Map<Context, Long> buffer = new HashMap<>();
+
+    public long getBufferAddress(Context context) {
+        return this.buffer.get(context);
+    }
+
+    public void setBuffer(Context context, long address) {
+        this.buffer.put(context, address);
+    }
+
+    public void removeBuffer(Context context) {
+        this.buffer.remove(context);
+    }
 }

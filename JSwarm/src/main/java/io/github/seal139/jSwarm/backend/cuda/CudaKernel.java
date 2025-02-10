@@ -1,45 +1,53 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
 import io.github.seal139.jSwarm.core.Kernel;
-import io.github.seal139.jSwarm.runtime.datatype.Vector;
+import io.github.seal139.jSwarm.misc.Common;
+import sun.misc.Unsafe;
 
 public class CudaKernel implements Kernel {
 
     private final long   address;
     private final String name;
 
-    long getAddress() { return address; }
+    long getAddress() { return this.address; }
 
-    CudaKernel(CudaModule module, String name) throws CudaException {
-        this.name = name;
-        long r[] = CudaDriver.cudaGetKernel(module.getAddress(), name);
+    CudaKernel(CudaContext context, CudaModule module, String name) throws CudaException {
+        final Unsafe mem = Common.getMemoryManagement();
 
-        if (r[0] != 0l) {
-            throw new CudaException(r[0]);
+        long intptr = CudaDriver.cudaGetKernel(context.getAddress(), module.getAddress(), name);
+
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new CudaException(errorCode);
         }
 
-        this.address = r[1];
+        // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
+
+        this.name    = name;
+        this.address = mem.getLong(intptr + 8);
     }
 
     @Override
-    public String getName() { return name; }
+    public String getName() { return this.name; }
 
+    // ==== Object ====
     @Override
-    public void setArgument(int index, Vector<? extends Number> data) {
-        // TODO Auto-generated method stub
-
+    public String toString() {
+        return getName() + "@" + String.valueOf(this.address);
     }
 
     @Override
-    public void setGlobalNDSize(long... dim) {
-        // TODO Auto-generated method stub
-
+    public int hashCode() {
+        return (int) this.address;
     }
 
     @Override
-    public void setLocalNDSize(long... dim) {
-        // TODO Auto-generated method stub
-
+    public boolean equals(Object obj) {
+        return (obj.hashCode() == hashCode()) //
+               && (obj instanceof CudaKernel) //
+               && (((CudaKernel) obj).address == this.address);
     }
-
 }

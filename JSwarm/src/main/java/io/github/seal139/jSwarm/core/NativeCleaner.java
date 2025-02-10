@@ -15,7 +15,7 @@ public final class NativeCleaner {
      * to use that. This interface is bind with Java Garbage Collector to perform
      * cleanup when object is phantom reachable.
      */
-    public static interface NativeResources extends AutoCloseable {
+    public interface NativeResources extends AutoCloseable {
 
         /**
          * When object is phantom reachable, it means the data is no longer exist. In
@@ -23,7 +23,7 @@ public final class NativeCleaner {
          * lost. This special interface is a workaround which is responsible to perform
          * cleanup for native resources for that object.
          */
-        public static interface Deallocator {
+        public interface Deallocator {
 
             /**
              * Perform native resource cleanup
@@ -37,6 +37,18 @@ public final class NativeCleaner {
          * @return {@link Deallocator} for this object
          */
         Deallocator getDeallocator();
+
+        boolean isClosed();
+    }
+
+    public static class DeallocatedException extends Exception {
+
+        private static final long serialVersionUID = 5227062002232052580L;
+
+        public DeallocatedException() {
+            super("Resources is closed");
+        }
+
     }
 
     private static final Cleaner CLEANER = Cleaner.create();

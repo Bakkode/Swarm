@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
@@ -79,6 +80,8 @@ public final class Common {
             throw new Exception("Failed to complete task for " + job);
         }
     }
+
+    public static ByteOrder getEndianness() { return ByteOrder.nativeOrder(); }
 
     public static String getDriverByOs(String platform, String name) throws IOException {
         File f = File.createTempFile("swarm-", ".driver");

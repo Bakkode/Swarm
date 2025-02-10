@@ -11,7 +11,7 @@ import io.github.seal139.jSwarm.misc.Common;
 
 public final class Swarm {
     private Swarm() {
-    };
+    }
 
     private static final Set<Class<? extends Platform>> platformCls = new HashSet<>();
 
@@ -31,7 +31,6 @@ public final class Swarm {
             constructor.setAccessible(true);
 
             T obj = constructor.newInstance();
-            obj.init();
 
             platforms.put(obj.getName(), obj);
         }
@@ -42,7 +41,7 @@ public final class Swarm {
     /**
      * Register new additional {@link Platform} driver to Swarm. Additional driver
      * should be registered before {@link Swarm#init()} is called.
-     * 
+     *
      * @param driver {@link Platform} driver class.
      */
     public static void register(Class<? extends Platform> driver) {
@@ -70,7 +69,7 @@ public final class Swarm {
     /**
      * Is this program runs in debug mode? <br/>
      * This is an alternative method of {@link Common#isDebugMode()}.
-     * 
+     *
      * @return True only when debug.
      */
     public static boolean isDebugMode() { return Common.isDebugMode(); }
@@ -81,12 +80,12 @@ public final class Swarm {
      * Allow debug and set breakpoint on kernel code. By default, this behavior is
      * always true <br/>
      * <br/>
-     * 
+     *
      * Notes: <br/>
      * Kernel cannot be debugged when run through parallel API. To allow that, we
      * need to change executor to JVM (With reduced performance). <b> Only apply
      * when {@link Swarm#isDebugMode()} is true.</br>
-     * 
+     *
      * @param flag Set true to allow debug on kernel
      */
     public static void debugKernel(boolean flag) {
@@ -119,7 +118,7 @@ public final class Swarm {
 
     /**
      * Get all {@link Executor} from all {@link Platform}.
-     * 
+     *
      * @return Array of {@link Executor}. Guaranteed to be sorted based on
      *         {@link Platform#isPrimary()} and device performance index.
      */
@@ -133,7 +132,7 @@ public final class Swarm {
 
     /**
      * Get all {@link Executor} from specific {@link Platform} by it's name.
-     * 
+     *
      * @param platformName Name of the platform. Can be retrieved from
      *                     {@link Swarm#getPlatformNames()}.
      * @return Array of {@link Executor}. Guaranteed to be sorted based on
@@ -163,7 +162,7 @@ public final class Swarm {
 
     /**
      * Get the highest performance {@link Executor} from specific {@link Platform}.
-     * 
+     *
      * @param platformName Name of the platform. Can be retrieved from
      *                     {@link Swarm#getPlatformNames()}.
      * @return Highest performance {@link Executor}.
