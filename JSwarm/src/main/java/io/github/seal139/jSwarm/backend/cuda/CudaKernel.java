@@ -14,7 +14,7 @@ public class CudaKernel implements Kernel {
     CudaKernel(CudaContext context, CudaModule module, String name) throws CudaException {
         final Unsafe mem = Common.getMemoryManagement();
 
-        long intptr = CudaDriver.cudaGetKernel(context.getAddress(), module.getAddress(), name);
+        long intptr = CudaDriver.cudaGetKernel(module.getAddress(), name);
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {

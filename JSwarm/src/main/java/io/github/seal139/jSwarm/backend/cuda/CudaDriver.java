@@ -25,7 +25,7 @@ final class CudaDriver {
 
         try {
 //            System.load(Common.getDriverByOs(PLATFORM, "cudriver"));
-            System.load("C:\\wsl\\Programming\\Swarm\\C\\swarmcu\\out\\build\\x64-release\\swarmsimd.dll");
+            System.load("C:\\wsl\\Programming\\Swarm\\C\\swarmcu\\out\\build\\x64-release\\swarmcu.dll");
             b = true;
         }
         catch (Throwable e) {
@@ -57,32 +57,34 @@ final class CudaDriver {
     static native long cudaCreateContext(int device); // Ok
     static native int cudaDeleteContext(long context); // Ok
 
+    static native int cudaSetContext(long context);
+
     // Queue (1 Context : n Queue)
-    static native long cudaAddQueue(long context, int count); // Ok
-    static native int cudaDeleteQueue(long context, long[] queue, int count); // Ok
+    static native long cudaAddQueue(int count); // Ok
+    static native int cudaDeleteQueue(long[] queue, int count); // Ok
 
     // Module (1 Context : n Module)
-    static native long cudaCreateProgram(long context, String source); // Ok
-    static native int cudaDeleteProgram(long context, long module); // Ok
+    static native long cudaCreateProgram(String source); // Ok
+    static native int cudaDeleteProgram(long module); // Ok
 
     // Kernel (1 Module : n Kernel)
-    static native long cudaGetKernel(long context, long program, String name); // Ok
+    static native long cudaGetKernel(long program, String name); // Ok
 
     // ==== Launcher ====
-    static native void cudaLaunch(long context, long kernel, long queue, //
+    static native void cudaLaunch(long kernel, long queue, //
                                   int x, int y, int z, //
                                   int lx, int ly, int lz, //
                                   long[] arguments, int count); // Ok
 
     // ==== buffer memory management ====
 
-    static native long cudaHook(long context, long size); // ok
+    static native long cudaHook(long size); // ok
 
-    static native int cudaSyncDataTo(long context, long queue, long hostMemory, long deviceMemory, long size); // Ok
-    static native int cudaSyncDataFrom(long context, long queue, long hostMemory, long deviceMemory, long size); // Ok
+    static native int cudaSyncDataTo(long queue, long hostMemory, long deviceMemory, long size); // Ok
+    static native int cudaSyncDataFrom(long queue, long hostMemory, long deviceMemory, long size); // Ok
 
-    static native int cudaUnhook(long context, long hookAddress); // Ok
+    static native int cudaUnhook(long hookAddress); // Ok
 
     // ==== Fence ====
-    static native int cudaWaitAll(long context); // Native not yet
+    static native int cudaWaitAll(); // Native not yet
 }

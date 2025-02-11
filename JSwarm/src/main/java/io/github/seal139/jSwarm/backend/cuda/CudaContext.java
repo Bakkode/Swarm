@@ -45,7 +45,7 @@ public class CudaContext implements Context {
                 addr[i] = this.queueAddress.get(i).longValue();
             }
 
-            int r1 = CudaDriver.cudaDeleteQueue(this.address, addr, this.queueSize);
+            int r1 = CudaDriver.cudaDeleteQueue(addr, this.queueSize);
             if (r1 != 0L) {
                 Log.error(new CudaException(r1));
             }
@@ -118,7 +118,7 @@ public class CudaContext implements Context {
         }
 
         final Unsafe mem    = Common.getMemoryManagement();
-        final long   intptr = CudaDriver.cudaAddQueue(getAddress(), additionalNumber);
+        final long   intptr = CudaDriver.cudaAddQueue(additionalNumber);
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
@@ -200,7 +200,7 @@ public class CudaContext implements Context {
 
         }
 
-        CudaDriver.cudaLaunch(getAddress(), ((CudaKernel) kernel).getAddress(), hitQueueIndex(), //
+        CudaDriver.cudaLaunch(((CudaKernel) kernel).getAddress(), hitQueueIndex(), //
                 ndRange.getXGlobal(), ndRange.getYGlobal(), ndRange.getZGlobal(), //
                 ndRange.getXlocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
                 args, args.length);
@@ -212,7 +212,7 @@ public class CudaContext implements Context {
     public void hook(Vector<? extends Number> vector) throws CudaException {
         final Unsafe mem = Common.getMemoryManagement();
 
-        long intptr = CudaDriver.cudaHook(getAddress(), vector.longSize() * vector.getValueSize());
+        long intptr = CudaDriver.cudaHook(vector.longSize() * vector.getValueSize());
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
@@ -234,11 +234,9 @@ public class CudaContext implements Context {
             throw new DeallocatedException();
         }
 
-        final long contextAddress = getAddress();
-
         if (SyncDirection.TO_DEVICE.equals(direction)) {
             for (Vector<?> vec : dataCollection) {
-                int errorCode = CudaDriver.cudaSyncDataTo(contextAddress, hitQueueIndex(), //
+                int errorCode = CudaDriver.cudaSyncDataTo(hitQueueIndex(), //
                         vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
 
                 if (errorCode != 0) {
@@ -248,7 +246,7 @@ public class CudaContext implements Context {
         }
 
         for (Vector<?> vec : dataCollection) {
-            int errorCode = CudaDriver.cudaSyncDataFrom(contextAddress, hitQueueIndex(), //
+            int errorCode = CudaDriver.cudaSyncDataFrom(hitQueueIndex(), //
                     vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
 
             if (errorCode != 0) {
@@ -259,7 +257,7 @@ public class CudaContext implements Context {
 
     @Override
     public void unhook(Vector<? extends Number> vector) throws CudaException {
-        int errorCode = CudaDriver.cudaUnhook(getAddress(), vector.getBufferAddress(this));
+        int errorCode = CudaDriver.cudaUnhook(vector.getBufferAddress(this));
         if (errorCode != 0) {
             throw new CudaException(errorCode);
         }
@@ -269,7 +267,7 @@ public class CudaContext implements Context {
 
     @Override
     public void reHook(Vector<? extends Number> vector) throws CudaException {
-        int errorCode = CudaDriver.cudaUnhook(getAddress(), vector.getBufferAddress(this));
+        int errorCode = CudaDriver.cudaUnhook(vector.getBufferAddress(this));
         if (errorCode != 0) {
             throw new CudaException(errorCode);
         }
@@ -290,7 +288,7 @@ public class CudaContext implements Context {
             addr[i] = this.deallocator.queueAddress.get(i).longValue();
         }
 
-        int errorCode = CudaDriver.cudaWaitAll(getAddress());
+        int errorCode = CudaDriver.cudaWaitAll();
         if (errorCode != 0) {
             throw new CudaException(errorCode);
         }

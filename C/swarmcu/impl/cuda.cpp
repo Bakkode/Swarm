@@ -1,4 +1,3 @@
-#include <iostream>
 #include <vector>
 #include <string>
 
@@ -104,7 +103,7 @@ using namespace std;
         //else if (major == 9) coresPerSM *= 128; // Hopper
 
         // 6 TFLOPS
-        properties[6] = static_cast<jdouble>((2 * coresPerSM * clockRate * 1000) / 1e12); // TFLOPS estimate
+        properties[6] = static_cast<jlong>((2 * coresPerSM * clockRate * 1000)); // TFLOPS estimate
 
         return reinterpret_cast<jlong>(properties);
     }
@@ -167,14 +166,17 @@ using namespace std;
         return cuCtxDestroy(reinterpret_cast<CUcontext>(context));
     }
 
+    JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSetContext
+    (JNIEnv*, jclass, jlong context) {
+        return cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));        
+    }
+
     JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaAddQueue
-    (JNIEnv*, jclass, jlong context, jint count) {
+    (JNIEnv*, jclass, jint count) {
         // 0 Error
         // 1 ~ Stream ptr
         jlong* ret = new jlong[count + 1];
         ret[0] = 0;
-
-        //cuCtxSetCurrent(*(reinterpret_cast<CUcontext*>(context)));  
 
         for (int i = 0; i < count; i++) {
             ret[0] = cuStreamCreate(reinterpret_cast<CUstream*>(&ret[1 + i]), CU_STREAM_NON_BLOCKING);
@@ -194,10 +196,8 @@ using namespace std;
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaDeleteQueue
-    (JNIEnv* env, jclass clazz, jlong context, jlongArray jQueue, jint count) {
+    (JNIEnv* env, jclass clazz, jlongArray jQueue, jint count) {
         jlong* elements = env->GetLongArrayElements(jQueue, nullptr);
-
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
 
         CUresult err = CUDA_SUCCESS;
         for (int i = 0; i < count; i++) {
@@ -213,7 +213,7 @@ using namespace std;
     }
 
     JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaCreateProgram
-    (JNIEnv* env, jclass clazz, jlong context, jstring jsrc) {
+    (JNIEnv* env, jclass clazz, jstring jsrc) {
         const char* src = env->GetStringUTFChars(jsrc, nullptr);
 
         jlong* ret = new jlong[2];
@@ -256,7 +256,6 @@ using namespace std;
 
         nvrtcDestroyProgram(&prog);
 
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
         CUresult er = cuModuleLoadData(reinterpret_cast<CUmodule*>(&ret[1]), ptx.data());
         if (er != CUDA_SUCCESS) {
             ret[0] = er;
@@ -267,17 +266,14 @@ using namespace std;
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaDeleteProgram
-    (JNIEnv*, jclass, jlong context, jlong program) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
+    (JNIEnv*, jclass, jlong program) {
         return cuModuleUnload(reinterpret_cast<CUmodule>(program));
     }
 
     JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaGetKernel
-    (JNIEnv* env, jclass, jlong context, jlong program, jstring jkName) {
+    (JNIEnv* env, jclass, jlong program, jstring jkName) {
         jlong* ret = new jlong[2];
         ret[0] = 0;
-
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
 
         const char* kernelName = env->GetStringUTFChars(jkName, nullptr);
         ret[0] = cuModuleGetFunction(reinterpret_cast<CUfunction*>(&ret[1]), reinterpret_cast<CUmodule>(program), kernelName);
@@ -288,7 +284,7 @@ using namespace std;
 
     JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaLaunch
     (JNIEnv* env, jclass,
-        jlong context, jlong kernel, jlong queue,
+        jlong kernel, jlong queue,
         jint x, jint y, jint z,
         jint lx, jint ly, jint lz,
         jlongArray arguments, jint count) {
@@ -313,8 +309,7 @@ using namespace std;
     }
 
     JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaHook
-    (JNIEnv*, jclass, jlong context, jlong size) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
+    (JNIEnv*, jclass, jlong size) {
 
         jlong* ret = new jlong[2];
         ret[0] = cuMemAlloc(reinterpret_cast<CUdeviceptr*>(&ret[1]), size);
@@ -323,29 +318,21 @@ using namespace std;
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSyncDataTo
-    (JNIEnv*, jclass, jlong context, jlong queue, jlong hostMemory, jlong deviceMemory, jlong size) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
-
+    (JNIEnv*, jclass, jlong queue, jlong hostMemory, jlong deviceMemory, jlong size) {
         return cuMemcpyHtoDAsync(static_cast<CUdeviceptr>(deviceMemory), reinterpret_cast<void*>(hostMemory), size, reinterpret_cast<CUstream>(queue));
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSyncDataFrom
-    (JNIEnv*, jclass, jlong context, jlong queue, jlong hostMemory, jlong deviceMemory, jlong size) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
-
+    (JNIEnv*, jclass, jlong queue, jlong hostMemory, jlong deviceMemory, jlong size) {
         return cuMemcpyDtoHAsync(reinterpret_cast<void*>(hostMemory), static_cast<CUdeviceptr>(deviceMemory), size, reinterpret_cast<CUstream>(queue));
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaUnhook
-    (JNIEnv*, jclass, jlong context, jlong deviceMemory) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
-
+    (JNIEnv*, jclass, jlong deviceMemory) {
         return cuMemFree(static_cast<CUdeviceptr>(deviceMemory));
     }
 
     JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaWaitAll
-    (JNIEnv* env, jclass, jlong context) {
-        //cuCtxSetCurrent(reinterpret_cast<CUcontext>(context));
-
+    (JNIEnv* env, jclass) {
         return cuCtxSynchronize();
     }

@@ -57,11 +57,19 @@ extern "C" {
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
+	 * Method:    cudaSetContext
+	 * Signature: (J)I
+	 */
+	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSetContext
+	(JNIEnv*, jclass, jlong);
+
+	/*
+	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaAddQueue
-	 * Signature: (JI)J
+	 * Signature: (I)J
 	 */
 	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaAddQueue
-	(JNIEnv*, jclass, jlong, jint);
+	(JNIEnv*, jclass, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
@@ -69,15 +77,15 @@ extern "C" {
 	 * Signature: ([JI)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaDeleteQueue
-	(JNIEnv*, jclass, jlong, jlongArray, jint);
+	(JNIEnv*, jclass, jlongArray, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaCreateProgram
-	 * Signature: (JLjava/lang/String;)J
+	 * Signature: (Ljava/lang/String;)J
 	 */
 	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaCreateProgram
-	(JNIEnv*, jclass, jlong, jstring);
+	(JNIEnv*, jclass, jstring);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
@@ -85,47 +93,47 @@ extern "C" {
 	 * Signature: (J)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaDeleteProgram
-	(JNIEnv*, jclass, jlong, jlong);
+	(JNIEnv*, jclass, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaGetKernel
-	 * Signature: (JLLjava/lang/String;)J
+	 * Signature: (JLjava/lang/String;)J
 	 */
 	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaGetKernel
-	(JNIEnv*, jclass, jlong, jlong, jstring);
+	(JNIEnv*, jclass, jlong, jstring);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaLaunch
-	 * Signature: (JJJJJJJJJ[J)J
+	 * Signature: (JJIIIIII[JI)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaLaunch
-	(JNIEnv*, jclass, jlong, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jint);
+	(JNIEnv*, jclass, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaHook
-	 * Signature: (JJ)J
+	 * Signature: (J)J
 	 */
 	JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaHook
-	(JNIEnv*, jclass, jlong, jlong);
+	(JNIEnv*, jclass, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaSyncDataTo
-	 * Signature: (JJJJJ)I
+	 * Signature: (JJJJ)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSyncDataTo
-	(JNIEnv*, jclass, jlong, jlong, jlong, jlong, jlong);
+	(JNIEnv*, jclass, jlong, jlong, jlong, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaSyncDataFrom
-	 * Signature: (JJJJJ)I
+	 * Signature: (JJJJ)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaSyncDataFrom
-	(JNIEnv*, jclass, jlong, jlong, jlong, jlong, jlong);
+	(JNIEnv*, jclass, jlong, jlong, jlong, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
@@ -133,15 +141,15 @@ extern "C" {
 	 * Signature: (J)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaUnhook
-	(JNIEnv*, jclass, jlong, jlong);
+	(JNIEnv*, jclass, jlong);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_cuda_CudaDriver
 	 * Method:    cudaWaitAll
-	 * Signature: ([JI)I
+	 * Signature: ()I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaWaitAll
-	(JNIEnv*, jclass, jlong);
+	(JNIEnv*, jclass);
 
 #ifdef __cplusplus
 }

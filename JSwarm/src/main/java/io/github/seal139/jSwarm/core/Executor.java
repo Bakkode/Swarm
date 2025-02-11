@@ -17,7 +17,7 @@ public interface Executor {
      * situation and only cause additional overhead that can reduce performance
      * significantly. we strongly discourage you to call this method unless for
      * specific case that need multiple context.
-     * 
+     *
      * @return Newly created {@link Context}.
      */
     Context newContext() throws SwarmException;
@@ -80,21 +80,12 @@ public interface Executor {
      * @return Maximum local thread. This value is maximum possible per dimension
      *         not a product.
      */
-    long[] getMaxThreadPerDimension();
-
-    /**
-     * Get maximum local thread that can run per work-node based on ND-Range
-     * coordinate.
-     *
-     * @return Maximum local thread. This value is product (multiplication) of each
-     *         dimension.
-     */
-    int getMaxThread();
+    long getMaxThreadPerDimension();
 
     /**
      * Get device maximum theoretical performance.
      *
      * @return FLOPS number in Gigaflop.
      */
-    double getFlops();
+    long getFlops();
 }

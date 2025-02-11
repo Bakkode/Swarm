@@ -16,16 +16,9 @@ if(WIN32)
     set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
     set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}/lib/x64/")
 
-    # AMD HIP - ROCm
-    # set(ROCM_TOOLKIT_ROOT_DIR "C:/Program Files/AMD/ROCm/6.1/")
-    # set(ROCM_DIR "${ROCM_TOOLKIT_ROOT_DIR}/lib/")
-
     # Java
     set(JAVA_ROOT_DIR "C:/Program Files/OpenLogic/jdk-17.0.13.11-hotspot/")
     set(JAVA_DIR "${JAVA_ROOT_DIR}/lib/")
-    
-    # Currently not used
-    set(CMAKE_CUDA_COMPILER "${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc.exe")
 elseif(UNIX)
 
     # This location can vary. Please refer location by use command "which nvcc"
@@ -34,22 +27,18 @@ endif()
 
 
 file(GLOB_RECURSE LIB_CUDA "${CUDA_DIR}/*.lib" "${CUDA_DIR}/*.a" "${CUDA_DIR}/*.so")
-#file(GLOB_RECURSE LIB_ROCM "${ROCM_DIR}/*.lib" "${ROCM_DIR}/*.a" "${ROCM_DIR}/*.so")
 file(GLOB_RECURSE LIB_JAVA "${JAVA_DIR}/*.lib" "${JAVA_DIR}/*.a" "${JAVA_DIR}/*.so")
 
 
 # Find CUDA package (not always necessary, but can be useful)
 #find_package(OpenCL REQUIRED)
 find_package(CUDA)
-#find_package(ROCmCMakeBuildTools)
-#find_package(ROCM) # deprecated, but included for backwards compatibility
 find_package(Java REQUIRED)
 
 # Include directories
 include_directories(${JAVA_ROOT_DIR}/include)
 include_directories(${JAVA_ROOT_DIR}/include/win32)
 include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
-#include_directories(${ROCM_TOOLKIT_ROOT_DIR}/include)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -68,13 +57,6 @@ add_library (swarmcu SHARED
     ${SRC}
 )
 
-#add_library (swarmsimd SHARED
-#    ${HDR}
-#    ${BENCHMARK}
-#    ${SRC}
-#)
-
-#target_link_libraries(swarmsimd ${LIB_CUDA} ${LIB_ROCM} ${LIB_JAVA})
 target_link_libraries(swarmcu ${LIB_CUDA} ${LIB_JAVA})
 
 

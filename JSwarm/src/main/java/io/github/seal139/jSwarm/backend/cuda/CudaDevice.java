@@ -13,16 +13,14 @@ public class CudaDevice implements Executor {
     private final String name;
     private final long   computeUnit;
     private final long   totalMemory;
-    private final int    maxNdRange;
+    private final int    maxNdRange = 3;
     private final long[] maxNdRangeVal;
-    private final long[] maxThreadNdRange;
-    private final int    maxThread;
-    private final int    type;
-    private final float  flops;
+    private final long   maxThreadNdRange;
+    private final int    type       = 2;
+    private final long   flops;
 
     CudaDevice(int ptr, int index) throws CudaException {
         this.deviceId = ptr;
-        this.context  = new CudaContext(this);
 
         final Unsafe mem = Common.getMemoryManagement();
 
@@ -31,17 +29,14 @@ public class CudaDevice implements Executor {
         {
             this.computeUnit   = mem.getLong(infos);
             this.totalMemory   = mem.getLong(8L + infos);
-            this.maxNdRange    = 3;
             this.maxNdRangeVal = new long[] {
-                    mem.getLong(16 + infos), mem.getLong(24L + infos), mem.getLong(32L + infos) };
+                    mem.getLong(16 + infos),             // x
+                    mem.getLong(24L + infos),            // y
+                    mem.getLong(32L + infos)             // z
+            };
 
-            this.maxThreadNdRange = new long[] {
-                    mem.getLong(40L + infos), mem.getLong(48L + infos), mem.getLong(56 + infos) };
-
-            this.type      = mem.getInt(64L + infos);
-            this.maxThread = mem.getInt(68L + infos);
-
-            this.flops = mem.getFloat(70L + infos);
+            this.maxThreadNdRange = mem.getLong(40L + infos);
+            this.flops            = mem.getLong(48L + infos);
         }
         mem.freeMemory(infos);
     }
@@ -50,7 +45,7 @@ public class CudaDevice implements Executor {
 
     @Override
     public CudaContext getDefaultContext() throws CudaException {
-        if (this.context.isClosed()) {
+        if ((this.context == null) || this.context.isClosed()) {
             this.context = newContext();
         }
 
@@ -83,13 +78,10 @@ public class CudaDevice implements Executor {
     public long[] getMaxIndexPerDimension() { return this.maxNdRangeVal; }
 
     @Override
-    public long[] getMaxThreadPerDimension() { return this.maxThreadNdRange; }
+    public long getMaxThreadPerDimension() { return this.maxThreadNdRange; }
 
     @Override
-    public int getMaxThread() { return this.maxThread; }
-
-    @Override
-    public double getFlops() { return this.flops; }
+    public long getFlops() { return this.flops; }
 
     // ==== Object ====
     @Override

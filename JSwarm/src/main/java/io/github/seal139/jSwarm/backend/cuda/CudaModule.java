@@ -16,13 +16,11 @@ public class CudaModule implements Module {
 
     static final class DeallocatorImpl implements Deallocator {
         private final long address;
-        private final long ctxAddress;
 
         private boolean isClosed = false;
 
-        private DeallocatorImpl(long address, long ctxAddress) {
-            this.address    = address;
-            this.ctxAddress = ctxAddress;
+        private DeallocatorImpl(long address) {
+            this.address = address;
         }
 
         @Override
@@ -31,7 +29,7 @@ public class CudaModule implements Module {
                 return;
             }
 
-            int r2 = CudaDriver.cudaDeleteProgram(this.ctxAddress, this.address);
+            int r2 = CudaDriver.cudaDeleteProgram(this.address);
             if (r2 != 0) {
                 Log.error(new CudaException(r2));
             }
@@ -52,7 +50,7 @@ public class CudaModule implements Module {
     CudaModule(CudaContext ctx, String source) throws CudaException {
         final Unsafe mem = Common.getMemoryManagement();
 
-        final long intptr = CudaDriver.cudaCreateProgram(ctx.getAddress(), source);
+        final long intptr = CudaDriver.cudaCreateProgram(source);
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
@@ -63,7 +61,7 @@ public class CudaModule implements Module {
 
         this.ctx = ctx;
 
-        this.deallocator = new DeallocatorImpl(mem.getLong(intptr + 8), ctx.getAddress());
+        this.deallocator = new DeallocatorImpl(mem.getLong(intptr + 8));
 
         // Don't forget to deallocate memory
         mem.freeMemory(intptr);
