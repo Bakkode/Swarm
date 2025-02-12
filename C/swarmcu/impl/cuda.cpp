@@ -256,12 +256,8 @@ using namespace std;
 
         nvrtcDestroyProgram(&prog);
 
-        CUresult er = cuModuleLoadData(reinterpret_cast<CUmodule*>(&ret[1]), ptx.data());
-        if (er != CUDA_SUCCESS) {
-            ret[0] = er;
-        }
+        ret[0] = cuModuleLoadData(reinterpret_cast<CUmodule*>(&ret[1]), ptx.data());
 
-        CUfunction fun;
         return reinterpret_cast<jlong>(ret);
     }
 
