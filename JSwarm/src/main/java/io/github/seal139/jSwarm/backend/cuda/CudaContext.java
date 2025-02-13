@@ -21,14 +21,12 @@ import sun.misc.Unsafe;
 public class CudaContext implements Context {
 
     static final class DeallocatorImpl implements Deallocator {
-        private final List<Deallocator> moduleDec = new ArrayList<>();
+        private final long              address;
+        private final List<Deallocator> moduleDec    = new ArrayList<>();
+        private final List<Long>        queueAddress = new ArrayList<>();
 
-        private boolean    isClosed = false;
-        private final long address;
-
-        private final List<Long> queueAddress = new ArrayList<>();
-
-        private int queueSize;
+        private int     queueSize;
+        private boolean isClosed = false;
 
         private DeallocatorImpl(long address) {
             this.address = address;
@@ -70,8 +68,7 @@ public class CudaContext implements Context {
     CudaContext(CudaDevice device) throws CudaException {
         final Unsafe mem = Common.getMemoryManagement();
 
-        final int  deviceId = device.getDeviceId();
-        final long intptr   = CudaDriver.cudaCreateContext(deviceId);
+        final long intptr = CudaDriver.cudaCreateContext(device.getDeviceId());
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
@@ -105,6 +102,15 @@ public class CudaContext implements Context {
     public boolean isClosed() { return this.deallocator.isClosed; }
 
     // ============ Functionality Operation ==================
+
+    @Override
+    public void activate() throws SwarmException {
+        int err = CudaDriver.cudaSetContext(getAddress());
+
+        if (err != 0) {
+            throw new CudaException(err);
+        }
+    }
 
     private int queueIdx;
 
@@ -280,12 +286,6 @@ public class CudaContext implements Context {
     public void waitOperation() throws CudaException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
-        }
-
-        // Delete queue (stream)
-        long[] addr = new long[this.deallocator.queueSize];
-        for (int i = 0; i < this.deallocator.queueSize; i++) {
-            addr[i] = this.deallocator.queueAddress.get(i).longValue();
         }
 
         int errorCode = CudaDriver.cudaWaitAll();

@@ -13,6 +13,8 @@ import io.github.seal139.jSwarm.datatype.Vector;
  */
 public interface Context extends NativeResources {
 
+    void activate() throws SwarmException;
+
     /**
      * Load a {@link Class} of {@link Program} into a {@link Module}.
      *

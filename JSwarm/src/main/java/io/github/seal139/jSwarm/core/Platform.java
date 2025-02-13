@@ -43,9 +43,4 @@ public interface Platform {
      * @return
      */
     Executor[] getDevices();
-
-    /**
-     * Bind execution {@link Context} to caller thread
-     */
-    void setActiveContext(Context ctr) throws SwarmException;
 }

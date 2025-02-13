@@ -6,6 +6,7 @@ import io.github.seal139.jSwarm.misc.Common;
 import sun.misc.Unsafe;
 
 public class CudaDevice implements Executor {
+    private final DeviceType type = DeviceType.GPU_ACCELERATOR;
 
     private final int   deviceId;
     private CudaContext context;
@@ -16,7 +17,6 @@ public class CudaDevice implements Executor {
     private final int    maxNdRange = 3;
     private final long[] maxNdRangeVal;
     private final long   maxThreadNdRange;
-    private final int    type       = 2;
     private final long   flops;
 
     CudaDevice(int ptr, int index) throws CudaException {
@@ -52,7 +52,6 @@ public class CudaDevice implements Executor {
         return this.context;
     }
 
-    @Override
     public CudaContext newContext() throws CudaException {
         return new CudaContext(this);
     }
@@ -60,7 +59,7 @@ public class CudaDevice implements Executor {
     // ===== Information only =====
 
     @Override
-    public DeviceType getType() { return DeviceType.values()[this.type]; }
+    public DeviceType getType() { return this.type; }
 
     @Override
     public String getName() { return this.name; }

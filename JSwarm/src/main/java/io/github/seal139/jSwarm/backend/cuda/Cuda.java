@@ -1,9 +1,7 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
-import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.Executor;
 import io.github.seal139.jSwarm.core.Platform;
-import io.github.seal139.jSwarm.core.SwarmException;
 import io.github.seal139.jSwarm.misc.Common;
 import sun.misc.Unsafe;
 
@@ -77,14 +75,4 @@ public final class Cuda implements Platform {
 
     @Override
     public Executor[] getDevices() { return this.exec.clone(); }
-
-    @Override
-    public void setActiveContext(Context ctr) throws SwarmException {
-        int err = CudaDriver.cudaSetContext(((CudaContext) ctr).getAddress());
-
-        if (err != 0) {
-            throw new CudaException(err);
-        }
-    }
-
 }

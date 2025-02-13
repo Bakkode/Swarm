@@ -13,16 +13,6 @@ public interface Executor {
     Context getDefaultContext() throws SwarmException;
 
     /**
-     * Create new execution context. additional context is not needed in most
-     * situation and only cause additional overhead that can reduce performance
-     * significantly. we strongly discourage you to call this method unless for
-     * specific case that need multiple context.
-     *
-     * @return Newly created {@link Context}.
-     */
-    Context newContext() throws SwarmException;
-
-    /**
      * Get the type of the hardware device used by this Executor.
      *
      * @return The {@link DeviceType}.
