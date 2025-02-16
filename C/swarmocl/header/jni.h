@@ -109,7 +109,7 @@ extern "C" {
 	 * Signature: (JJIIIIII[JI)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLaunch
-	(JNIEnv*, jclass, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jlongArray, jint);
+	(JNIEnv*, jclass, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_ocl_OclDriver

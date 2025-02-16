@@ -65,7 +65,7 @@ using namespace std;
 
     JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_cuda_CudaDriver_cudaGetDeviceInfo
     (JNIEnv*, jclass, jint device) {
-        jlong* properties = new jlong[7];
+        jlong* properties = new jlong[12];
 
         // 0 Compute unit
         cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[0]), CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, device);
@@ -73,17 +73,18 @@ using namespace std;
         // 1 Global Memory
         cuDeviceTotalMem(reinterpret_cast<size_t*>(&properties[1]), device);
 
-        // 2 ND Range -X
+        // 2 Global Range -X, Y, Z
         cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[2]), CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, device);
-
-        // 3 ND Range -Y
         cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[3]), CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y, device);
-
-        // 4 ND Range -Z
         cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[4]), CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z, device);
 
-        // 5 Thread per block
-        cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[5]), CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, device);
+        // 3 Local Range -X, Y, Z
+        cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[5]), CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, device);
+        cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[6]), CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, device);
+        cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[7]), CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, device);
+
+        // 3 Thread per block
+        cuDeviceGetAttribute(reinterpret_cast<int*>(&properties[8]), CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, device);
 
         int clockRate, coresPerSM;
         cuDeviceGetAttribute(&clockRate, CU_DEVICE_ATTRIBUTE_CLOCK_RATE, device); // Clock rate in kHz
@@ -102,8 +103,11 @@ using namespace std;
         else if (major >= 8) coresPerSM *= 128; // Ampere
         //else if (major == 9) coresPerSM *= 128; // Hopper
 
-        // 6 TFLOPS
-        properties[6] = static_cast<jlong>((2 * coresPerSM * clockRate * 1000)); // TFLOPS estimate
+        // 4 FLOPS
+        properties[9] = static_cast<jlong>((2 * coresPerSM * ((float)clockRate / 1000000.0))); // GFLOPS estimate
+
+        // 5 UUID
+        cuDeviceGetUuid(reinterpret_cast<CUuuid*>(&properties[10]), device);
 
         return reinterpret_cast<jlong>(properties);
     }

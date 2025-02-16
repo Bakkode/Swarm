@@ -3,19 +3,51 @@
 #include <string>
 #include <CL/opencl.h>
 
-#include <iostream>
+#include <iomanip>
+#include <sstream>
 
 using namespace std;
 
 JNIEXPORT jstring JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclGetVersion
 (JNIEnv* env, jclass clazz) {
-    char icdVersion[256];
+    cl_uint numPlatforms;
+    clGetPlatformIDs(0, NULL, &numPlatforms);
 
-   /* if (clGetICDLoaderInfoOCLICD(CL_ICDL_OCL_VERSION, sizeof(icdVersion), icdVersion, NULL) == CL_SUCCESS) {
-        return env->NewStringUTF(icdVersion);
-    }*/
+    if (numPlatforms == 0) {
+        return env->NewStringUTF("Error");
+    }
 
-    return  env->NewStringUTF("Error");
+    std::vector<cl_platform_id> platforms(numPlatforms);
+    clGetPlatformIDs(numPlatforms, platforms.data(), NULL);
+
+    double minVersion = 999.9; // Arbitrary high value to find the lowest
+
+    for (cl_platform_id platform : platforms) {
+        cl_uint numDevices;
+        clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL, &numDevices);
+
+        if (numDevices == 0) continue; // No devices on this platform
+
+        std::vector<cl_device_id> devices(numDevices);
+        clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, numDevices, devices.data(), NULL);
+
+        for (cl_device_id device : devices) {
+            char versionString[128];
+            clGetDeviceInfo(device, CL_DEVICE_VERSION, sizeof(versionString), versionString, NULL);
+
+            // Extract major.minor version
+            double version = std::strtod(versionString + 7, NULL); // Skip "OpenCL " prefix
+
+            if (version < minVersion) {
+                minVersion = version;
+            }
+        }
+    }
+
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(1) << minVersion;
+
+    return  env->NewStringUTF(stream.str().c_str());
 }
 
 JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclEnumerateDevices
@@ -93,7 +125,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclE
 
 JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclGetDeviceInfo
 (JNIEnv*, jclass, jlong device) {
-    jlong* properties = new jlong[7];
+    jlong* properties = new jlong[9];
 
     // 0 Compute unit
     clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_MAX_COMPUTE_UNITS, 4, reinterpret_cast<cl_int*>(&properties[0]), NULL);
@@ -102,17 +134,30 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclG
     clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_GLOBAL_MEM_SIZE, 8, reinterpret_cast<cl_ulong*>(&properties[1]), NULL);
 
     // 2 ND Range -X, Y, Z
-    clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_MAX_WORK_ITEM_SIZES, 24, reinterpret_cast<cl_ulong*>(&properties[2]), NULL);
-
+    clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_MAX_WORK_ITEM_SIZES, 24, reinterpret_cast<cl_long*>(&properties[2]), NULL);
+    
     // 5 Thread per block
     clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_MAX_WORK_GROUP_SIZE, 8, reinterpret_cast<cl_ulong*>(&properties[5]), NULL);
 
     // 6 TFLOPS
-
     cl_uint clockRate;
     clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_MAX_CLOCK_FREQUENCY, sizeof(clockRate), &clockRate, NULL);
-    properties[6] = static_cast<jlong>((2 * properties[0] * clockRate * 1000)); // TFLOPS estimate
 
+    char vendor[64];
+    clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL);
+    if (strstr(vendor, "NVIDIA")) {
+        properties[6] = static_cast<jlong>((256 * (cl_int)properties[0] * ((float)clockRate / 1000.0))); // GFLOPS estimate
+    }
+    else if (strstr(vendor, "AMD")) {
+        properties[6] = static_cast<jlong>((128 * (cl_int)properties[0] * ((float)clockRate / 1000.0))); // GFLOPS estimate
+    }
+    else {
+        properties[6] = static_cast<jlong>((2 * (cl_int)properties[0] * ((float)clockRate / 1000.0))); // GFLOPS estimate
+    }
+    
+
+    clGetDeviceInfo(reinterpret_cast<cl_device_id>(device), CL_DEVICE_UUID_KHR, 16, reinterpret_cast<cl_ulong*>(&properties[7]), NULL);
+    
     return reinterpret_cast<jlong>(properties);
 }
 
@@ -271,7 +316,7 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     jlong kernel, jlong queue,
     jint x, jint y, jint z,
     jint lx, jint ly, jint lz,
-    jlongArray arguments, jlongArray size, jint count) {
+    jlongArray arguments, jint count) {
 
     jlong* elements = env->GetLongArrayElements(arguments, nullptr);
     jlong* sizes = env->GetLongArrayElements(arguments, nullptr);
@@ -287,8 +332,8 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
         }
     }
 
-    size_t globalSize[3] = { x, y, z };     
-    size_t localSize[3] = { lx, ly, lz };
+    size_t globalSize[3] = { static_cast<size_t>(x), static_cast<size_t>(y), static_cast<size_t>(z) };
+    size_t localSize[3]  = { static_cast<size_t>(lx), static_cast<size_t>(ly), static_cast<size_t>(lz) };
     
     cl_uint err = clEnqueueNDRangeKernel(reinterpret_cast<cl_command_queue>(queue), reinterpret_cast<cl_kernel>(kernel), 3, NULL, globalSize, localSize, 0, NULL, NULL);
  
