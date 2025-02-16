@@ -98,10 +98,10 @@ extern "C" {
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_ocl_OclDriver
 	 * Method:    oclDeleteKernel
-	 * Signature: (J)I
+	 * Signature: ([JI)I
 	 */
 	JNIEXPORT jint JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclDeleteKernel
-	(JNIEnv*, jclass, jlong);
+	(JNIEnv*, jclass, jlongArray, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_ocl_OclDriver
@@ -109,7 +109,7 @@ extern "C" {
 	 * Signature: (JJIIIIII[JI)V
 	 */
 	JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLaunch
-	(JNIEnv*, jclass, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jint);
+	(JNIEnv*, jclass, jlong, jlong, jint, jint, jint, jint, jint, jint, jlongArray, jlongArray, jint);
 
 	/*
 	 * Class:     io_github_seal139_jSwarm_backend_ocl_OclDriver
