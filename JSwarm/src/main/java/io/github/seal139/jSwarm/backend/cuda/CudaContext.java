@@ -61,12 +61,14 @@ public class CudaContext implements Context {
     // ============ Allocator - Deallocator ==================
 
     private final DeallocatorImpl deallocator;
+    private final CudaDevice      device;
 
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
 
     CudaContext(CudaDevice device) throws CudaException {
         final Unsafe mem = Common.getMemoryManagement();
+        this.device = device;
 
         final long intptr = CudaDriver.cudaCreateContext(device.getDeviceId());
 
@@ -102,6 +104,9 @@ public class CudaContext implements Context {
     public boolean isClosed() { return this.deallocator.isClosed; }
 
     // ============ Functionality Operation ==================
+
+    @Override
+    public CudaDevice getDevice() { return this.device; }
 
     @Override
     public void activate() throws SwarmException {
@@ -196,6 +201,10 @@ public class CudaContext implements Context {
     @Override
     @SuppressWarnings("unchecked")
     public void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+        if (this.device.getMaxLocalThread() < (ndRange.getXLocal() * ndRange.getYLocal() * ndRange.getZLocal())) {
+            throw new SwarmException("Local Worksize excedeed maximum thread");
+        }
+
         long[] args = new long[arguments.length];
 
         {
@@ -203,12 +212,11 @@ public class CudaContext implements Context {
             for (int i = 0; i < size; i++) {
                 args[i] = arguments[i].getBufferAddress(this);
             }
-
         }
 
         CudaDriver.cudaLaunch(((CudaKernel) kernel).getAddress(), hitQueueIndex(), //
                 ndRange.getXGlobal(), ndRange.getYGlobal(), ndRange.getZGlobal(), //
-                ndRange.getXlocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
+                ndRange.getXLocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
                 args, args.length);
     }
 

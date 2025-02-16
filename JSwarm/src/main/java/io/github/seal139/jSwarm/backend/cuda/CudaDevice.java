@@ -1,5 +1,7 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
+import java.util.UUID;
+
 import io.github.seal139.jSwarm.core.DeviceType;
 import io.github.seal139.jSwarm.core.Executor;
 import io.github.seal139.jSwarm.misc.Common;
@@ -16,8 +18,10 @@ public class CudaDevice implements Executor {
     private final long   totalMemory;
     private final int    maxNdRange = 3;
     private final long[] maxNdRangeVal;
+    private final long[] maxNdRangeValLocal;
     private final long   maxThreadNdRange;
     private final long   flops;
+    private final String uuid;
 
     CudaDevice(int ptr, int index) throws CudaException {
         this.deviceId = ptr;
@@ -27,16 +31,24 @@ public class CudaDevice implements Executor {
         this.name = CudaDriver.cudaGetDeviceName(index);
         final long infos = CudaDriver.cudaGetDeviceInfo(index);
         {
-            this.computeUnit   = mem.getLong(infos);
+            this.computeUnit   = mem.getInt(infos);
             this.totalMemory   = mem.getLong(8L + infos);
             this.maxNdRangeVal = new long[] {
-                    mem.getLong(16 + infos),             // x
-                    mem.getLong(24L + infos),            // y
-                    mem.getLong(32L + infos)             // z
+                    mem.getInt(16 + infos),              // x
+                    mem.getInt(24L + infos),             // y
+                    mem.getInt(32L + infos)              // z
             };
 
-            this.maxThreadNdRange = mem.getLong(40L + infos);
-            this.flops            = mem.getLong(48L + infos);
+            this.maxNdRangeValLocal = new long[] {
+                    mem.getInt(40 + infos), // x
+                    mem.getInt(48L + infos), // y
+                    mem.getInt(56L + infos) // z
+            };
+
+            this.maxThreadNdRange = mem.getInt(64L + infos);
+            this.flops            = mem.getLong(72L + infos);
+
+            this.uuid = new UUID(mem.getLong(80L + infos), mem.getLong(88L + infos)).toString();
         }
         mem.freeMemory(infos);
     }
@@ -74,10 +86,16 @@ public class CudaDevice implements Executor {
     public int getMaxNDRange() { return this.maxNdRange; }
 
     @Override
-    public long[] getMaxIndexPerDimension() { return this.maxNdRangeVal; }
+    public long[] getMaxGlobalSize() { return this.maxNdRangeVal; }
 
     @Override
-    public long getMaxThreadPerDimension() { return this.maxThreadNdRange; }
+    public long[] getMaxLocalSize() { return this.maxNdRangeValLocal; }
+
+    @Override
+    public long getMaxLocalThread() { return this.maxThreadNdRange; }
+
+    @Override
+    public String getUuid() { return this.uuid; }
 
     @Override
     public long getFlops() { return this.flops; }

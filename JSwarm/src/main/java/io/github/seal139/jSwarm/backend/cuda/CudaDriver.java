@@ -17,7 +17,7 @@ final class CudaDriver {
     private static final boolean   loaded;
     private static final Throwable exception;
 
-    private static final String PLATFORM = "cuda";
+    private static final String PLATFORM = "CUDA";
 
     static {
         boolean   b = false;

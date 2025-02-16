@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.backend.hip;
+package io.github.seal139.jSwarm.backend.ocl;
 
 import java.util.UUID;
 
@@ -7,11 +7,11 @@ import io.github.seal139.jSwarm.core.Executor;
 import io.github.seal139.jSwarm.misc.Common;
 import sun.misc.Unsafe;
 
-public class HipDevice implements Executor {
+public class OclDevice implements Executor {
     private final DeviceType type = DeviceType.GPU_ACCELERATOR;
 
-    private final int  deviceId;
-    private HipContext context;
+    private final long deviceId;
+    private OclContext context;
 
     private final String name;
     private final long   computeUnit;
@@ -23,51 +23,49 @@ public class HipDevice implements Executor {
     private final long   flops;
     private final String uuid;
 
-    HipDevice(int index) throws HipException {
-        this.deviceId = index;
+    OclDevice(long ptr, int index) throws OclException {
+        this.deviceId = ptr;
 
         final Unsafe mem = Common.getMemoryManagement();
 
-        this.name = HipDriver.hipGetDeviceName(index);
-        final long infos = HipDriver.hipGetDeviceInfo(index);
+        this.name = OclDriver.oclGetDeviceName(ptr);
+        final long infos = OclDriver.oclGetDeviceInfo(ptr);
         {
-            this.computeUnit   = mem.getLong(infos);
+            this.computeUnit   = mem.getInt(infos);
             this.totalMemory   = mem.getLong(8L + infos);
             this.maxNdRangeVal = new long[] {
-                    mem.getLong(16 + infos),             // x
-                    mem.getLong(24L + infos),            // y
-                    mem.getLong(32L + infos)             // z
+                    65535,                               // x
+                    65535,                               // y
+                    65535                                // z
             };
 
             this.maxNdRangeValLocal = new long[] {
-                    mem.getInt(40 + infos), // x
-                    mem.getInt(48L + infos), // y
-                    mem.getInt(56L + infos) // z
+                    mem.getLong(16L + infos), // x
+                    mem.getLong(24L + infos), // y
+                    mem.getLong(32L + infos) // z
             };
 
-            this.maxThreadNdRange = mem.getLong(64L + infos);
-            this.flops            = mem.getLong(72L + infos);
+            this.maxThreadNdRange = mem.getInt(40L + infos);
+            this.flops            = mem.getLong(48L + infos);
 
-            this.uuid = new UUID(mem.getLong(80L + infos), mem.getLong(88L + infos)).toString();
+            this.uuid = new UUID(mem.getLong(56L + infos), mem.getLong(64L + infos)).toString();
         }
         mem.freeMemory(infos);
     }
 
-    int getDeviceId() { return this.deviceId; }
+    long getDeviceId() { return this.deviceId; }
 
     @Override
-    public HipContext getDefaultContext() throws HipException {
-        int err = HipDriver.hipSetDevice(getDeviceId());
-
-        if (err != 0) {
-            throw new HipException(err);
-        }
-
+    public OclContext getDefaultContext() throws OclException {
         if ((this.context == null) || this.context.isClosed()) {
-            this.context = new HipContext(this);
+            this.context = newContext();
         }
 
         return this.context;
+    }
+
+    public OclContext newContext() throws OclException {
+        return new OclContext(this);
     }
 
     // ===== Information only =====
@@ -110,11 +108,11 @@ public class HipDevice implements Executor {
 
     @Override
     public int hashCode() {
-        return this.deviceId;
+        return (int) this.deviceId;
     }
 
     @Override
     public boolean equals(Object obj) {
-        return (obj.hashCode() == hashCode()) && (obj instanceof HipDevice);
+        return (obj.hashCode() == hashCode()) && (obj instanceof OclDevice);
     }
 }

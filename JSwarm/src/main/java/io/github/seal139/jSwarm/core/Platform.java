@@ -31,7 +31,9 @@ public interface Platform {
     boolean isPrimary();
 
     /**
-     * Get platform version
+     * Get platform version. In case of multiple {@link Executor device} has
+     * different supported version. This will return the oldest version to ensure
+     * maximum compatibility possible
      *
      * @return Platform version
      */

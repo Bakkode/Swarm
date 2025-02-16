@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.backend.hip;
+package io.github.seal139.jSwarm.backend.ocl;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,18 +18,18 @@ import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
 import sun.misc.Unsafe;
 
-public class HipContext implements Context {
+public class OclContext implements Context {
 
     static final class DeallocatorImpl implements Deallocator {
-        private final int               deviceId;
+        private final long              address;
         private final List<Deallocator> moduleDec    = new ArrayList<>();
         private final List<Long>        queueAddress = new ArrayList<>();
 
         private int     queueSize;
         private boolean isClosed = false;
 
-        private DeallocatorImpl(int address) {
-            this.deviceId = address;
+        private DeallocatorImpl(long address) {
+            this.address = address;
         }
 
         @Override
@@ -43,12 +43,17 @@ public class HipContext implements Context {
                 addr[i] = this.queueAddress.get(i).longValue();
             }
 
-            int r1 = HipDriver.hipDeleteQueue(addr, this.queueSize);
+            int r1 = OclDriver.oclDeleteQueue(addr, this.queueSize);
             if (r1 != 0L) {
-                Log.error(new HipException(r1));
+                Log.error(new OclException(r1));
             }
 
             // Delete this object (context)
+            int r2 = OclDriver.oclDeleteContext(this.address);
+            if (r2 != 0L) {
+                Log.error(new OclException(r2));
+            }
+
             this.isClosed = true;
         }
     }
@@ -56,30 +61,39 @@ public class HipContext implements Context {
     // ============ Allocator - Deallocator ==================
 
     private final DeallocatorImpl deallocator;
-    private final HipDevice       device;
+    private final Ocl             ocl = Ocl.getInstance();
+    private final OclDevice       device;
 
     @Override
     public Deallocator getDeallocator() { return this.deallocator; }
 
-    HipContext(HipDevice device) throws HipException {
-        this.device = device;
+    OclContext(OclDevice device) throws OclException {
+        final Unsafe mem = Common.getMemoryManagement();
 
-        this.deallocator = new DeallocatorImpl(device.getDeviceId());
+        final long intptr = OclDriver.oclCreateContext(device.getDeviceId());
 
-        this.deallocator.queueSize = 0;
+        int errorCode = (int) mem.getLong(intptr);
+        if (errorCode != 0) {
+            // Don't forget to deallocate memory
+            mem.freeMemory(intptr);
+            throw new OclException(errorCode);
+        }
+
+        this.deallocator = new DeallocatorImpl(mem.getLong(intptr + 8));
+        this.device      = device;
+
+        // By default, creating context will include 4 stream queue. this is useful for
+        // concurrent data transfer
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 16));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 24));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 32));
+        this.deallocator.queueAddress.add(mem.getLong(intptr + 40));
+        this.deallocator.queueSize = 4;
         this.queueIdx              = 0;
 
         // Don't forget to deallocate memory
+        mem.freeMemory(intptr);
         NativeCleaner.register(this);
-
-        activate();
-
-        try {
-            addParallelismLevel(4);
-        }
-        catch (DeallocatedException de) {
-
-        }
     }
 
     @Override
@@ -93,15 +107,11 @@ public class HipContext implements Context {
     // ============ Functionality Operation ==================
 
     @Override
-    public HipDevice getDevice() { return this.device; }
+    public OclDevice getDevice() { return this.device; }
 
     @Override
-    public void activate() throws HipException {
-        int err = HipDriver.hipSetDevice((int) getAddress());
-
-        if (err != 0) {
-            throw new HipException(err);
-        }
+    public void activate() throws SwarmException {
+        this.ocl.setContext(this.getAddress());
     }
 
     private int queueIdx;
@@ -110,19 +120,19 @@ public class HipContext implements Context {
     public int getParallelismLevel() { return this.deallocator.queueSize; }
 
     @Override
-    public void addParallelismLevel(int additionalNumber) throws HipException, DeallocatedException {
+    public void addParallelismLevel(int additionalNumber) throws OclException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
 
         final Unsafe mem    = Common.getMemoryManagement();
-        final long   intptr = HipDriver.hipAddQueue(additionalNumber);
+        final long   intptr = OclDriver.oclAddQueue(this.device.getDeviceId(), this.ocl.getContextValue(), additionalNumber);
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
             // Don't forget to deallocate memory
             mem.freeMemory(intptr);
-            throw new HipException(errorCode);
+            throw new OclException(errorCode);
         }
 
         this.deallocator.queueSize += additionalNumber;
@@ -175,7 +185,7 @@ public class HipContext implements Context {
             throw new DeallocatedException();
         }
 
-        return new HipModule(this, program);
+        return new OclModule(this, program);
     }
 
     @Override
@@ -188,6 +198,10 @@ public class HipContext implements Context {
     @Override
     @SuppressWarnings("unchecked")
     public void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+        if (this.device.getMaxLocalThread() < (ndRange.getXLocal() * ndRange.getYLocal() * ndRange.getZLocal())) {
+            throw new SwarmException("Local Worksize excedeed maximum thread");
+        }
+
         long[] args = new long[arguments.length];
 
         {
@@ -198,8 +212,8 @@ public class HipContext implements Context {
 
         }
 
-        HipDriver.hipLaunch(((HipKernel) kernel).getAddress(), hitQueueIndex(), //
-                ndRange.getXGlobal(), ndRange.getYGlobal(), ndRange.getZGlobal(), //
+        OclDriver.oclLaunch(((OclKernel) kernel).getAddress(), hitQueueIndex(), //
+                ndRange.getXGlobal() * ndRange.getXLocal(), ndRange.getYGlobal() * ndRange.getYLocal(), ndRange.getZGlobal() * ndRange.getZLocal(), //
                 ndRange.getXLocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
                 args, args.length);
     }
@@ -207,16 +221,16 @@ public class HipContext implements Context {
     // ==== buffer memory management ====
 
     @Override
-    public void hook(Vector<? extends Number> vector) throws HipException {
+    public void hook(Vector<? extends Number> vector) throws OclException {
         final Unsafe mem = Common.getMemoryManagement();
 
-        long intptr = HipDriver.hipHook(vector.longSize() * vector.getValueSize());
+        long intptr = OclDriver.oclHook(this.ocl.getContextValue(), vector.longSize() * vector.getValueSize());
 
         int errorCode = (int) mem.getLong(intptr);
         if (errorCode != 0) {
             // Don't forget to deallocate memory
             mem.freeMemory(intptr);
-            throw new HipException(errorCode);
+            throw new OclException(errorCode);
         }
 
         vector.setBuffer(this, mem.getLong(intptr + 8));
@@ -227,47 +241,47 @@ public class HipContext implements Context {
 
     @Override
     @SuppressWarnings("unchecked")
-    public void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws HipException, DeallocatedException {
+    public void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws OclException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
 
         if (SyncDirection.TO_DEVICE.equals(direction)) {
             for (Vector<?> vec : dataCollection) {
-                int errorCode = HipDriver.hipSyncDataTo(hitQueueIndex(), //
+                int errorCode = OclDriver.oclSyncDataTo(hitQueueIndex(), //
                         vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
 
                 if (errorCode != 0) {
-                    throw new HipException(errorCode);
+                    throw new OclException(errorCode);
                 }
             }
         }
 
         for (Vector<?> vec : dataCollection) {
-            int errorCode = HipDriver.hipSyncDataFrom(hitQueueIndex(), //
+            int errorCode = OclDriver.oclSyncDataFrom(hitQueueIndex(), //
                     vec.getNativeAddress(), vec.getBufferAddress(this), vec.longSize() * vec.getValueSize());
 
             if (errorCode != 0) {
-                throw new HipException(errorCode);
+                throw new OclException(errorCode);
             }
         }
     }
 
     @Override
-    public void unhook(Vector<? extends Number> vector) throws HipException {
-        int errorCode = HipDriver.hipUnhook(vector.getBufferAddress(this));
+    public void unhook(Vector<? extends Number> vector) throws OclException {
+        int errorCode = OclDriver.oclUnhook(vector.getBufferAddress(this));
         if (errorCode != 0) {
-            throw new HipException(errorCode);
+            throw new OclException(errorCode);
         }
 
         vector.removeBuffer(this);
     }
 
     @Override
-    public void reHook(Vector<? extends Number> vector) throws HipException {
-        int errorCode = HipDriver.hipUnhook(vector.getBufferAddress(this));
+    public void reHook(Vector<? extends Number> vector) throws OclException {
+        int errorCode = OclDriver.oclUnhook(vector.getBufferAddress(this));
         if (errorCode != 0) {
-            throw new HipException(errorCode);
+            throw new OclException(errorCode);
         }
 
         hook(vector);
@@ -275,14 +289,19 @@ public class HipContext implements Context {
     // ==== Fence ====
 
     @Override
-    public void waitOperation() throws HipException, DeallocatedException {
+    public void waitOperation() throws OclException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
 
-        int errorCode = HipDriver.hipWaitAll();
+        long[] addr = new long[this.deallocator.queueSize];
+        for (int i = 0; i < this.deallocator.queueSize; i++) {
+            addr[i] = this.deallocator.queueAddress.get(i).longValue();
+        }
+
+        int errorCode = OclDriver.oclWaitAll(addr, this.deallocator.queueSize);
         if (errorCode != 0) {
-            throw new HipException(errorCode);
+            throw new OclException(errorCode);
         }
     }
 
@@ -298,7 +317,7 @@ public class HipContext implements Context {
 
     // =============== Object Operation ======================
 
-    long getAddress() { return this.deallocator.deviceId; }
+    long getAddress() { return this.deallocator.address; }
 
     @Override
     public int hashCode() {
@@ -309,7 +328,7 @@ public class HipContext implements Context {
     @Override
     public boolean equals(Object obj) {
         return (obj.hashCode() == hashCode() //
-        ) && (obj instanceof HipContext //
-        ) && (((HipModule) obj).getAddress() == getAddress());
+        ) && (obj instanceof OclContext //
+        ) && (((OclModule) obj).getAddress() == getAddress());
     }
 }
