@@ -1,7 +1,7 @@
 package io.github.seal139.jSwarm.core;
 
-import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
-import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
+import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources;
 
 /**
  * Represent GPU module or programs that holds {@link Kernel}

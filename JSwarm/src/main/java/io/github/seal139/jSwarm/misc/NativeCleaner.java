@@ -1,9 +1,9 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.misc;
 
 import java.lang.ref.Cleaner;
 import java.lang.ref.Cleaner.Cleanable;
 
-import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources.Deallocator;
+import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources.Deallocator;
 
 /**
  * GC daemon to delete resources when object is garbage collected

@@ -2,9 +2,9 @@ package io.github.seal139.jSwarm.core;
 
 import java.util.Collection;
 
-import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
-import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.datatype.Vector;
+import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources;
 
 /**
  * Represent execution context. In terms of GPGPU, Context plays a crucial parts

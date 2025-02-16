@@ -7,8 +7,6 @@ import java.util.List;
 import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.Kernel;
 import io.github.seal139.jSwarm.core.Module;
-import io.github.seal139.jSwarm.core.NativeCleaner;
-import io.github.seal139.jSwarm.core.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.core.NdRange;
 import io.github.seal139.jSwarm.core.Program;
 import io.github.seal139.jSwarm.core.SwarmException;
@@ -16,6 +14,8 @@ import io.github.seal139.jSwarm.core.SyncDirection;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
+import io.github.seal139.jSwarm.misc.NativeCleaner;
+import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
 import sun.misc.Unsafe;
 
 public class HipContext implements Context {

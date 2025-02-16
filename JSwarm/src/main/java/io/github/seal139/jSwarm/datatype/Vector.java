@@ -8,9 +8,9 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import io.github.seal139.jSwarm.core.Context;
-import io.github.seal139.jSwarm.core.NativeCleaner;
-import io.github.seal139.jSwarm.core.NativeCleaner.NativeResources;
 import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.misc.NativeCleaner;
+import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources;
 import sun.misc.Unsafe;
 
 /**

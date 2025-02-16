@@ -7,33 +7,33 @@ import java.util.ListIterator;
 /**
  * High performance array of float.
  */
-public final class FloatArray extends Vector<Float> {
+public final class LongVector extends Vector<Long> {
 
-    private static final long WORD_SIZE  = 4;
-    private static final long SHIFT_SIZE = 2;
+    private static final long WORD_SIZE  = 8;
+    private static final long SHIFT_SIZE = 3;
 
     // ============ Allocator - Deallocator ==================
 
-    public FloatArray() {
+    public LongVector() {
         super(16, false, WORD_SIZE, SHIFT_SIZE);
     }
 
-    public FloatArray(long initial) {
+    public LongVector(long initial) {
         super(initial, false, WORD_SIZE, SHIFT_SIZE);
     }
 
-    public FloatArray(long initial, boolean aligned) {
+    public LongVector(long initial, boolean aligned) {
         super(initial, aligned, WORD_SIZE, SHIFT_SIZE);
     }
 
-    public FloatArray(long address, long size) {
+    public LongVector(long address, long size) {
         super(address, address + (size * WORD_SIZE), WORD_SIZE, SHIFT_SIZE);
     }
 
     // ============ Functionality Operation ==================
 
     @Override
-    public List<Float> subList(long fromIndex, long toIndex) {
+    public List<Long> subList(long fromIndex, long toIndex) {
         // Safety check
         fromIndex = this.lBound + (fromIndex << this.bit_t);
         if ((fromIndex < this.lBound) || (fromIndex >= this.indexPtr)) {
@@ -51,11 +51,11 @@ public final class FloatArray extends Vector<Float> {
             throw new ArrayIndexOutOfBoundsException("Out of bound: " + String.valueOf(toIndex));
         }
 
-        return new FloatArray(fromIndex, toIndex - fromIndex);
+        return new LongVector(fromIndex, toIndex - fromIndex);
     }
 
     @Override
-    public boolean addAll(Collection<? extends Float> c) {
+    public boolean addAll(Collection<? extends Long> c) {
         long additional = c.size() - capacity();
 
         if (additional > 0) {
@@ -63,7 +63,7 @@ public final class FloatArray extends Vector<Float> {
         }
 
         c.forEach(e -> {
-            memAlloc.putFloat(this.indexPtr, e);
+            memAlloc.putLong(this.indexPtr, e);
             this.indexPtr += this.size_t;
         });
 
@@ -71,19 +71,19 @@ public final class FloatArray extends Vector<Float> {
     }
 
     @Override
-    public boolean add(Float e) {
+    public boolean add(Long e) {
         if (this.indexPtr >= this.uBound) {
             reinit(capacity() * 2L, this.size_t);
         }
 
-        memAlloc.putFloat(this.indexPtr, e);
+        memAlloc.putLong(this.indexPtr, e);
         this.indexPtr += this.size_t;
 
         return true;
     }
 
     @Override
-    public Float get(long index) {
+    public Long get(long index) {
         // Safety check
         if ((index < 0) || ((this.lBound + (index << this.bit_t)) >= this.indexPtr)) {
             throw new ArrayIndexOutOfBoundsException("Out of bound: " + String.valueOf(index));
@@ -93,17 +93,17 @@ public final class FloatArray extends Vector<Float> {
     }
 
     @Override
-    public Float set(long index, Float element) {
+    public Long set(long index, Long element) {
         // Safety check
         if ((index < 0) || ((this.lBound + (index << this.bit_t)) >= this.indexPtr)) {
             throw new ArrayIndexOutOfBoundsException("Out of bound: " + String.valueOf(index));
         }
 
-        return directSet(index, element.floatValue());
+        return directSet(index, element.longValue());
     }
 
     @Override
-    public Float remove(long index) {
+    public Long remove(long index) {
         if ((index < 0) || ((this.lBound + (index << this.bit_t)) >= this.indexPtr)) {
             throw new ArrayIndexOutOfBoundsException("Out of bound: " + String.valueOf(index));
         }
@@ -119,17 +119,17 @@ public final class FloatArray extends Vector<Float> {
         }
 
         for (long i = this.lBound; i < this.indexPtr; i += this.size_t) {
-            memAlloc.putFloat(i, 0.0f);
+            memAlloc.putLong(i, 0);
         }
     }
 
     @Override
-    public long longIndexOf(Float element) {
-        final float ref = element.floatValue();
-        final long  s   = (longSize() << this.bit_t) + this.lBound;
+    public long longIndexOf(Long element) {
+        final double ref = element.longValue();
+        final long   s   = (longSize() << this.bit_t) + this.lBound;
 
         for (long i = this.lBound; i < s; i += this.size_t) {
-            if (memAlloc.getFloat(i) == ref) {
+            if (memAlloc.getLong(i) == ref) {
                 return (i - this.lBound) >> this.bit_t;
             }
         }
@@ -138,12 +138,12 @@ public final class FloatArray extends Vector<Float> {
     }
 
     @Override
-    public long longLastIndexOf(Float o) {
-        final float ref = o.floatValue();
-        final long  s   = (longSize() << this.bit_t) + (this.lBound - this.size_t);
+    public long longLastIndexOf(Long o) {
+        final double ref = o.longValue();
+        final long   s   = (longSize() << this.bit_t) + (this.lBound - this.size_t);
 
         for (long i = s; i >= this.lBound; i -= this.size_t) {
-            if (memAlloc.getFloat(i) == ref) {
+            if (memAlloc.getLong(i) == ref) {
                 return (i - this.lBound) >> this.bit_t;
             }
         }
@@ -152,13 +152,13 @@ public final class FloatArray extends Vector<Float> {
     }
 
     @Override
-    public ListIterator<Float> listIterator(int index) {
+    public ListIterator<Long> listIterator(int index) {
         return new ListIterator<>() {
-            private final long st = FloatArray.this.size_t;
-            private final long bt = FloatArray.this.bit_t;
-            private final long ub = FloatArray.this.indexPtr - this.st;
+            private final long st = LongVector.this.size_t;
+            private final long bt = LongVector.this.bit_t;
+            private final long ub = LongVector.this.indexPtr - this.st;
 
-            private long memPtr = FloatArray.this.lBound + ((index - 1) << this.bt);
+            private long memPtr = LongVector.this.lBound + ((index - 1) << this.bt);
 
             @Override
             public boolean hasNext() {
@@ -171,14 +171,14 @@ public final class FloatArray extends Vector<Float> {
             }
 
             @Override
-            public Float next() {
+            public Long next() {
                 this.memPtr += this.st;
-                return memAlloc.getFloat(this.memPtr);
+                return memAlloc.getLong(this.memPtr);
             }
 
             @Override
             public boolean hasPrevious() {
-                return this.memPtr >= FloatArray.this.lBound;
+                return this.memPtr >= LongVector.this.lBound;
             }
 
             @Override
@@ -187,14 +187,14 @@ public final class FloatArray extends Vector<Float> {
             }
 
             @Override
-            public Float previous() {
+            public Long previous() {
                 this.memPtr -= this.st;
-                return memAlloc.getFloat(this.memPtr);
+                return memAlloc.getLong(this.memPtr);
             }
 
             @Override
-            public void set(Float e) {
-                memAlloc.putFloat(this.memPtr, e);
+            public void set(Long e) {
+                memAlloc.putLong(this.memPtr, e);
             }
 
             @Override
@@ -203,41 +203,41 @@ public final class FloatArray extends Vector<Float> {
             }
 
             @Override
-            public void add(Float e) {
+            public void add(Long e) {
                 throw new UnsupportedOperationException("Not supported due to performance issue");
             }
         };
     }
 
     // -----=======~~ Direct Functionality ~~~=======-----
-    public float directGet(long index) {
-        return memAlloc.getFloat(this.lBound + (index << this.bit_t));
+    public long directGet(long index) {
+        return memAlloc.getLong(this.lBound + (index << this.bit_t));
     }
 
-    public float directSet(long index, float element) {
-        final long  memPtr = this.lBound + (index << this.bit_t);
-        final float value  = memAlloc.getFloat(memPtr);
+    public long directSet(long index, Long element) {
+        final long memPtr = this.lBound + (index << this.bit_t);
+        final long value  = memAlloc.getLong(memPtr);
 
-        memAlloc.putFloat(memPtr, element);
+        memAlloc.putLong(memPtr, element);
         return value;
     }
 
-    public float directRemove(long index) {
+    public long directRemove(long index) {
         final long idx = this.lBound + (index << this.bit_t);
 
-        final float prevValue = memAlloc.getFloat(idx);
+        final long prevValue = memAlloc.getLong(idx);
 
         if (this.dynamic) {
             // Shift left
             for (long i = idx; i < this.indexPtr; i += this.size_t) {
-                memAlloc.putFloat(i, memAlloc.getFloat(i + this.size_t));
+                memAlloc.putLong(i, memAlloc.getLong(i + this.size_t));
             }
 
             this.indexPtr -= this.size_t;
             return prevValue;
         }
 
-        memAlloc.putFloat(idx, 0.0f);
+        memAlloc.putLong(idx, 0);
         return prevValue;
     }
 }
