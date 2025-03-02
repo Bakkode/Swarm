@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.api.OutputSinkFactory;
@@ -41,7 +43,187 @@ public abstract class Decompiler {
                 this.srcGen = srcGen;
             }
 
+            public static String replaceAll(String text, Map<Pattern, String> replacements) {
+                StringBuilder result = new StringBuilder(text);
+
+                for (Map.Entry<Pattern, String> entry : replacements.entrySet()) {
+                    Pattern pattern = entry.getKey();
+                    Matcher matcher = pattern.matcher(result);
+
+                    int          lastIndex = 0;
+                    StringBuffer temp      = new StringBuffer();
+
+                    while (matcher.find()) {
+                        matcher.appendReplacement(temp, Matcher.quoteReplacement(entry.getValue()));
+                    }
+                    matcher.appendTail(temp);
+
+                    // Update result efficiently
+                    result.setLength(0);
+                    result.append(temp);
+                }
+                return result.toString();
+            }
+
+            private String functionHeader(String src) {
+                return null;
+            }
+
+            private String functionBody(String src) {
+                return null;
+            }
+
+            /**
+             * Handle java array to make it compatible with C or C++ style
+             *
+             * @param decompiledSrc
+             * @return
+             */
+            private String sanitizeArray(String decompiledSrc) {
+                /* Used to re-arrange array with predefined size */ {
+                    Pattern pattern = Pattern.compile( //
+                            "(\\b(int|Integer|long|Long|short|Short|float|Float|double|Double))\\[\\]\\s+(\\w+)\\s*=\\s*new\\s+\\2\\[(\\d+)\\]" //
+                    );
+
+                    Matcher matcher = pattern.matcher(decompiledSrc);
+                    decompiledSrc = matcher.replaceAll("$1 $3[$4]");
+                }
+
+                /* Used to re-arrange array with predefined value */ {
+                    Pattern pattern = Pattern.compile( //
+                            "(\\b(int|Integer|long|Long|short|Short|float|Float|double|Double))\\[\\]\\s+(\\w+)\\s*=\\s*new\\s+\\2\\[\\]" //
+                    );
+
+                    Matcher matcher = pattern.matcher(decompiledSrc);
+                    decompiledSrc = matcher.replaceAll("$2 $3[] = ");
+                }
+
+                return decompiledSrc;
+            }
+
+            /**
+             * Used to rearrange single assignment a = b = c = d;
+             *
+             * @param decompiledSrc
+             * @return
+             */
+            private String sanitizeSingleAssignment(String decompiledSrc) {
+
+                String  pattern = "((.*)\\b(int|Integer|long|Long|short|Short|float|Float|double|Double).+=.+=.+)"; // Detect multiple space
+                                                                                                                    // within
+                                                                                                                    // the same line
+                Pattern regex   = Pattern.compile(pattern);
+                Matcher matcher = regex.matcher(decompiledSrc);
+
+                while (matcher.find()) {
+
+                    StringBuilder replacement = new StringBuilder();
+
+                    // it hard to use regex without manual parsing
+                    // So, in this case, we will loop through the string in reverse order to get the
+                    // first assignment order;
+
+                    char[] refChar = matcher.group().toCharArray();
+                    int    length  = refChar.length - 1;
+
+                    // We are looking for 2nd = after 1st = to determine the bound
+                    String prevVariable = null;
+
+                    StringBuilder variable  = new StringBuilder();
+                    StringBuilder sanitizer = new StringBuilder();
+
+                    for (int i = length; i >= 0; i--) {
+                        if (refChar[i] == '=') {
+                            char[] token = variable.reverse().toString().trim().toCharArray();
+
+                            // Sanitize parenthesis
+                            int tokenLength = token.length;
+                            int equilibrium = 0;
+                            for (int l = 0; l < tokenLength; l++) {
+                                if (token[l] == '(') {
+                                    equilibrium--;
+                                }
+                                else if (token[l] == ')') {
+                                    if (equilibrium == 0) {
+                                        continue;
+                                    }
+
+                                    equilibrium++;
+                                }
+
+                                sanitizer.append(token[l]);
+                            }
+
+                            String assignment = sanitizer.toString();
+                            sanitizer.setLength(0);
+
+                            if (prevVariable != null) {
+                                assignment = assignment.replaceAll("\\)|\\(", "");
+                                replacement.append(matcher.group(2) + assignment + prevVariable + ";\n");
+                            }
+
+                            prevVariable = " = " + assignment;
+
+                            variable.setLength(0);
+                        }
+                        else {
+                            variable.append(refChar[i]);
+                        }
+                    }
+
+                    replacement.append(variable.reverse().toString() + prevVariable + ";");
+
+                    decompiledSrc = matcher.replaceFirst(replacement.toString());
+                }
+
+                return decompiledSrc;
+            }
+
+            private String aliases(String decompiledSrc) {
+                return """
+                        typedef int Integer;
+                        typedef long Long;
+                        typedef short Short;
+                        typedef double Double;
+                        typedef float Float;
+                        """ + decompiledSrc;
+            }
+
+            private String commentRemover(String decompiledSrc) {
+                // Use Pattern.DOTALL to match across multiple lines
+                Pattern pattern = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+                Matcher matcher = pattern.matcher(decompiledSrc);
+
+                // Remove all block comments
+                return matcher.replaceAll("");
+            }
+
             private String postProcess(String decompiledSrc) {
+                Pattern headerPattern = Pattern.compile("^(public|protected).*\\{$");
+
+                decompiledSrc = sanitizeArray(decompiledSrc);
+                decompiledSrc = sanitizeSingleAssignment(decompiledSrc);
+                decompiledSrc = aliases(decompiledSrc);
+                decompiledSrc = commentRemover(decompiledSrc);
+
+                Map<Pattern, String> genericReplacement = new HashMap<>();
+                genericReplacement.put(Pattern.compile("(\\bprotected\\b)"), "__device__");
+                genericReplacement.put(Pattern.compile("(\\bpublic\\b)"), "__kernel__");
+
+                genericReplacement.put(Pattern.compile("(\\bfloat\\[\\])"), "float*");
+                genericReplacement.put(Pattern.compile("(\\bdouble\\[\\])"), "double*");
+                genericReplacement.put(Pattern.compile("(\\bshort\\[\\])"), "short*");
+                genericReplacement.put(Pattern.compile("(\\bint\\[\\])"), "int*");
+                genericReplacement.put(Pattern.compile("(\\blong\\[\\])"), "long*");
+
+                try {
+
+                    System.out.println(replaceAll(decompiledSrc, genericReplacement));
+                }
+                catch (Throwable e) {
+                    e.printStackTrace();
+                }
+
                 String str[] = ("extern \"C\" { \n" + decompiledSrc.replaceAll("(.*\\bpackage\\b.*\n)" // Remove --line '%package%'
                         + "|" + "(.*\\bimport\\b.*\n)" // Remove --line '%import%'
                         + "|" + "(\\bfinal\\b)" // Remove --word 'final'
@@ -50,7 +232,7 @@ public abstract class Decompiler {
                         + "|" + "(.*\\bimplements\\b.*\n)" // Remove --line 'implements'
                         + "|" + "(\\bthis\\.\\b)" // Remove --word 'this'
                         // + "|" + "((?<=\\S|\\s)@\\S*\\s?)" // Remove --annotation
-                        + "|" + "(\\bprotected\\b)" // Remove --word 'protected'
+                        + "|" + "" // Remove --word 'protected'
                         + "|" + "(\\bprivate\\b)" // Remove --word 'private'
                         + "|" + "(\\/\\*[\\s\\S]*?\\*\\/)" // Remove --comment
                         , "")).split("\n");
