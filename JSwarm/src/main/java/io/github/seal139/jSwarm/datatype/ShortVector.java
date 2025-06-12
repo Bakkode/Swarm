@@ -9,8 +9,8 @@ import java.util.ListIterator;
  */
 public final class ShortVector extends Vector<Short> {
 
-    private static final long WORD_SIZE  = 8;
-    private static final long SHIFT_SIZE = 3;
+    private static final long WORD_SIZE  = 2;
+    private static final long SHIFT_SIZE = 1;
 
     // ============ Allocator - Deallocator ==================
 

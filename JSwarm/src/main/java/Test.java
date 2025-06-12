@@ -1,68 +1,203 @@
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
 import io.github.seal139.jSwarm.backend.cuda.Cuda;
+import io.github.seal139.jSwarm.backend.cuda.CudaTranspiler;
+import io.github.seal139.jSwarm.backend.ocl.Ocl;
 import io.github.seal139.jSwarm.core.Context;
 import io.github.seal139.jSwarm.core.Executor;
 import io.github.seal139.jSwarm.core.Kernel;
 import io.github.seal139.jSwarm.core.Module;
 import io.github.seal139.jSwarm.core.NativeException;
 import io.github.seal139.jSwarm.core.NdRange;
+import io.github.seal139.jSwarm.core.Platform;
 import io.github.seal139.jSwarm.core.SwarmException;
 import io.github.seal139.jSwarm.core.SyncDirection;
-import io.github.seal139.jSwarm.datatype.FloatArray;
+import io.github.seal139.jSwarm.datatype.FloatVector;
+import io.github.seal139.jSwarm.datatype.IntVector;
 import io.github.seal139.jSwarm.datatype.Vector;
-import io.github.seal139.jSwarm.misc.Decompiler;
+import io.github.seal139.jSwarm.transpiler.Decompiler;
 
 public class Test {
-    @SuppressWarnings("unchecked")
-    public static void cudaTest() throws Error, SwarmException, Exception {
-        Cuda     cuda   = Cuda.getInstance();
-        Executor device = cuda.getDevices()[0];
 
-        try (//
-                Context ctx = device.getDefaultContext(); //
-                Module module = ctx.loadProgram("""
-                        extern "C" __global__ void vecAdd(const float* a, const float* b, float* c, const float* n) {
-                            int idx = blockIdx.x * blockDim.x + threadIdx.x;
-                            if (idx < (int)*n) {
-                                c[idx] = a[idx] + b[idx];
-                            }
-                        }
-                        """); //
-                //
-                Vector<Float> i1 = new FloatArray(5, true); //
-                Vector<Float> i2 = new FloatArray(5, true); //
-                Vector<Float> o1 = new FloatArray(5, true); //
-                Vector<Float> n = new FloatArray(1, true);) {
+    public static void clTest() throws Error, SwarmException, Exception {
+
+        // __global for array parameter
+        String oclKernel = """
+                __kernel void vecAdd(__global float* a, __global float* b, __global float* c, float d) {
+                    int idx = get_global_id(0);
+                    if (idx < 5) {
+                        c[idx] = d * (a[idx] + b[idx]);
+                    }
+                }
+                    """;
+
+        Platform platform = Ocl.getInstance();
+
+        System.out.println(platform.getName() + " v" + platform.getVersion() + "\n");
+        for (Executor dev : platform.getDevices()) {
+
+            System.out.println(dev.getUuid() + ": " + dev.getName());
+            System.out.println(dev.getFlops() + " GFLOPS");
+            System.out.println("Compute Unit: " + String.valueOf(dev.getComputeUnit()));
+            System.out.println("Total Memory: " + String.valueOf(dev.getTotalMemory() / 1049000000) + "Gb");
+            System.out.println("NDRange: 3");
+            System.out.println("Max Global NDRange [" //
+                    + String.valueOf(dev.getMaxGlobalSize()[0]) + ", " //
+                    + String.valueOf(dev.getMaxGlobalSize()[1]) + ", " //
+                    + String.valueOf(dev.getMaxGlobalSize()[2]) + "]");
+
+            System.out.println("Max Local NDRange [" //
+                    + String.valueOf(dev.getMaxLocalSize()[0]) + ", " //
+                    + String.valueOf(dev.getMaxLocalSize()[1]) + ", " //
+                    + String.valueOf(dev.getMaxLocalSize()[2]) + "]");
+
+            System.out.println("Max Local Thread: " + String.valueOf(dev.getMaxLocalThread()));
+
+            System.out.println("\n");
+        }
+
+        Executor device = platform.getDevices()[0];
+
+        try {
+            Context ctx = device.getDefaultContext(); // ((CudaDevice) device).newContext();
+//            Context cetax = device.getDefaultContext();        //
+
+            ctx.activate();
+
+            Module module = ctx.loadProgram(oclKernel); //
+            //
+            Vector<Float>   i1 = new FloatVector(5, true); //
+            Vector<Float>   i2 = new FloatVector(5, true); //
+            Vector<Float>   o1 = new FloatVector(5, true); //
+            Vector<Integer> n  = new IntVector(1, true);
 
             for (long i = 0; i < 5; i++) {
                 i1.set(i, (1 + i) * 1.0f);
                 i2.set(i, (6 + i) * 1.0f);
             }
-            n.set(0L, 5f);
+            n.set(0L, 5);
 
             ctx.hook(i1);
             ctx.hook(i2);
             ctx.hook(o1);
             ctx.hook(n);
 
+            //
+
             ctx.sync(SyncDirection.TO_DEVICE, i1, i2, n);
             ctx.waitOperation();
 
             Kernel addKernel = module.getKernel("vecAdd");
-            ctx.launch(addKernel, NdRange.OneDimensional(5), i1, i2, o1, n);
+            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, n, 2.64f);
             ctx.waitOperation();
 
             ctx.sync(SyncDirection.TO_HOST, o1);
             ctx.waitOperation();
 
+            ctx.unhook(i1);
+            ctx.unhook(i2);
+            ctx.unhook(o1);
+
             o1.forEach(v -> System.out.println(v));
             System.out.println("End");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static void cudaTest() throws Error, SwarmException, Exception {
+        String cudaKernel = """
+                    extern "C" __global__ void vecAdd(const float* a, const float* b, float* c, const int* n, float d) {
+                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+                    if (idx < *n) {
+                        c[idx] = d + (a[idx] + b[idx]);
+                    }
+                }
+                """;
+
+        Platform platform = Cuda.getInstance();
+
+        System.out.println(platform.getName() + " v" + platform.getVersion() + "\n");
+        for (Executor dev : platform.getDevices()) {
+
+            System.out.println(dev.getUuid() + ": " + dev.getName());
+            System.out.println(dev.getFlops() + " GFLOPS");
+            System.out.println("Compute Unit: " + String.valueOf(dev.getComputeUnit()));
+            System.out.println("Total Memory: " + String.valueOf(dev.getTotalMemory() / 1049000000) + "Gb");
+            System.out.println("NDRange: 3");
+            System.out.println("Max Global NDRange [" //
+                    + String.valueOf(dev.getMaxGlobalSize()[0]) + ", " //
+                    + String.valueOf(dev.getMaxGlobalSize()[1]) + ", " //
+                    + String.valueOf(dev.getMaxGlobalSize()[2]) + "]");
+
+            System.out.println("Max Local NDRange [" //
+                    + String.valueOf(dev.getMaxLocalSize()[0]) + ", " //
+                    + String.valueOf(dev.getMaxLocalSize()[1]) + ", " //
+                    + String.valueOf(dev.getMaxLocalSize()[2]) + "]");
+
+            System.out.println("Max Local Thread: " + String.valueOf(dev.getMaxLocalThread()));
+
+            System.out.println("\n");
+        }
+
+        Executor device = platform.getDevices()[0];
+
+        try {
+            Context ctx = device.getDefaultContext(); // ((CudaDevice) device).newContext();
+//            Context cetax = device.getDefaultContext();        //
+
+            ctx.activate();
+
+//            Module module = ctx.loadProgram(cudaKernel); //
+            Module module = ctx.loadProgram(ExampleKernel.class); //
+
+            //
+            Vector<Float>   i1 = new FloatVector(5, true); //
+            Vector<Float>   i2 = new FloatVector(5, true); //
+            Vector<Float>   o1 = new FloatVector(5, true); //
+            Vector<Integer> n  = new IntVector(1, true);
+
+            for (long i = 0; i < 5; i++) {
+                i1.set(i, (1 + i) * 1.0f);
+                i2.set(i, (6 + i) * 1.0f);
+            }
+            n.set(0L, 5);
+
+            ctx.hook(i1);
+            ctx.hook(i2);
+            ctx.hook(o1);
+            ctx.hook(n);
+
+            //
+
+            ctx.sync(SyncDirection.TO_DEVICE, i1, i2, n);
+            ctx.waitOperation();
+
+            Kernel addKernel = module.getKernel("vecAdd");
+            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, n, 2.64f);
+            ctx.waitOperation();
+
+            ctx.sync(SyncDirection.TO_HOST, o1);
+            ctx.waitOperation();
+
+            ctx.unhook(i1);
+            ctx.unhook(i2);
+            ctx.unhook(o1);
+
+            o1.forEach(v -> System.out.println(v));
+            System.out.println("End");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -96,7 +231,7 @@ public class Test {
         List<Float> av = List.of(20.2f, 14.25f, 6.179f);
 
         List<Float> ff = new ArrayList<>(100_000_000);
-        try (Vector<Float> fv = new FloatArray(100_000_000, false)) {
+        try (Vector<Float> fv = new FloatVector(100_000_000, false)) {
             for (int i = 0; i < 100_000_000; i++) {
                 ff.add(1.5f * i);
                 fv.add(1.5f * i);
@@ -174,10 +309,10 @@ public class Test {
         rf  += 1;
         System.out.println("-Java list iteration took " + (ctr / 1000000.0) + "ms");
 
-        try (FloatArray fv = new FloatArray(8192, true);) {
+        try (FloatVector fv = new FloatVector(max, true);) {
             ctr = System.nanoTime();
             for (int i = 0; i < max; i++) {
-                fv.add(ff);
+                fv.set(i, ff);
             }
 
             ctr = System.nanoTime() - ctr;
@@ -206,7 +341,7 @@ public class Test {
             for (int k = 0; k < 1; k++) {
 
                 // 8 * 8192, 8192, 4
-                try (FloatArray fv = new FloatArray(dir);) { // buffer * 2
+                try (FloatVector fv = new FloatVector(dir);) { // buffer * 2
 
                     long ctr = System.nanoTime();
                     for (int i = 0; i < max; i++) {
@@ -233,15 +368,6 @@ public class Test {
     }
 
     private static void benchFloatVector(boolean dynamic) throws Exception {
-        // 262136, 16
-
-        // 131068, 64: 15-21ms
-        // I think this is the most optimal. More node with Smaller buffer for insertion
-        // 32 buckets cause collision
-
-        // 8192, 16: 16-21ms // 32kb L1 caching
-        // Based on benchmark, this is the optimal. i think this due to L1 caching
-        // multiply by 2 for every 9,000,000
 
         int dir = 1073741824;
         for (long j = dir; j >= 2; j /= 2) {
@@ -253,7 +379,7 @@ public class Test {
             for (int k = 0; k < 10; k++) {
 
                 // 8 * 8192, 8192, 4
-                try (Vector<Float> fv = new FloatArray(j, true);) { // buffer * 2
+                try (Vector<Float> fv = new FloatVector(j, true);) { // buffer * 2
 
                     long ctr = System.nanoTime();
                     ctr = System.nanoTime();
@@ -293,61 +419,89 @@ public class Test {
     public static void main(String... strings) throws Exception {
         cudaTest();
 
-        int[] a = {
-                1, 2, 3, 4, 5 };
+        testPerformanceComparison();
 
-        int[] b = a;
+        System.out.println("===");
 
-        b[1] = 20;
+        int count = 20;
 
-        long l = 7_768_998_213L;
-        System.out.println((int) l);
+        final CyclicBarrier cb  = new CyclicBarrier(count);
+        ForkJoinPool        fjp = new ForkJoinPool(20);
 
-        testVectorSync();
-//        testPerformanceComparison();
+        int value[] = {
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+        int a[] = {
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+
+        int b[] = {
+                2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 7, 7, 7, 7, 7 };
+
+        for (int i = 0; i < count; i++) {
+            final int c = i;
+
+            fjp.submit(() -> {
+
+                ExampleKernel x = new ExampleKernel(cb, count, count, count, count, count, count, count, count, count, count, count, count, count,
+                        count, count, count, count, count);
+
+                try {
+                    // x.execute(c, value, a, b);
+                }
+                catch (Exception e) {
+                    // TODO: handle exception
+                }
+            });
+        }
+
+        fjp.awaitQuiescence(30, TimeUnit.SECONDS);
+
+//        cudaTest();
+//
+//        int[] a = {
+//                1, 2, 3, 4, 5 };
+//
+//        int[] b = a;
+//
+//        b[1] = 20;
+//
+//        long l = 7_768_998_213L;
+//        System.out.println((int) l);
+//
+//        testVectorSync();
+////        testPerformanceComparison();
+//
+////        benchFloatVector(true);
+////        System.out.println("====");
 //        benchFloatVector(true);
-//        System.out.println("====");
-        benchFloatVector(true);
 
         // benchFloatArray();
         // writeFloatVector();
 
-//        Test t = new Test();
+        Test t = new Test();
 //
-//        t.decompile();
+        t.decompile();
     }
 
     public void decompile() throws Exception {
+
+        // ============
+
+//        String classPath = "/" + ExampleKernel.class.getName().replace('.', '/') + ".class";
+//
+//        Decompiler d = Decompiler.getDefault();
+//
+//        String s1 = d.process(List.of(ExampleKernel.class), this::processCuda);
+//
+//        System.out.println("\n\n\n============\n\n\n");
+
         String classPath = "/" + ExampleKernel.class.getName().replace('.', '/') + ".class";
 
-        Decompiler d = Decompiler.getDefault();
+        Decompiler d = new Decompiler();
 
-        String s1 = d.process(List.of(ExampleKernel.class), this::processCuda);
+        System.out.println(Decompiler.process(new CudaTranspiler(), ExampleKernel.class));
 
-        System.out.println();
-
-        System.out.println(s1);
         System.out.println("\n\n\n============\n\n\n");
-
-        try (InputStream input = Test.class.getResourceAsStream(classPath)) {
-            if (input != null) {
-                System.out.println("Bytecode for " + ":");
-                byte[] buffer = input.readAllBytes();
-
-                // Print bytecode in hexadecimal format
-                for (byte b : buffer) {
-                    System.out.printf("%02x ", b);
-                }
-                System.out.println();
-            }
-            else {
-                System.out.println("Class not found in the JAR.");
-            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     public String processCuda(String s) {

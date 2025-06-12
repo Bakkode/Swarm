@@ -179,21 +179,41 @@ public class HipContext implements Context {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void launch(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+    public void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException {
         launchAsync(kernel, ndRange, arguments);
         waitOperation();
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+    public void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException {
         long[] args = new long[arguments.length];
 
         {
             final int size = arguments.length;
             for (int i = 0; i < size; i++) {
-                args[i] = arguments[i].getBufferAddress(this);
+                if (arguments[i] instanceof Vector v) {
+                    args[i] = v.getBufferAddress(this);
+                }
+                else if (arguments[i] instanceof Double d) {
+                    args[i] = Double.doubleToRawLongBits(d.doubleValue());
+                }
+                else if (arguments[i] instanceof Float f) {
+                    args[i] = Float.floatToRawIntBits(f.floatValue());
+                }
+                else if (arguments[i] instanceof Long l) {
+                    args[i] = l.longValue();
+                }
+                else if (arguments[i] instanceof Short s) {
+                    long ll = s.shortValue();
+
+                    // Fill for MSB and LSB for endian-safe system
+                    args[i] |= ll;
+                    args[i] |= ll << 48;
+                }
+                else {
+                    long l = arguments[i].intValue();
+                    args[i] = (l << 32) | l; // Fill for MSB and LSB for endian-safe system
+                }
             }
 
         }

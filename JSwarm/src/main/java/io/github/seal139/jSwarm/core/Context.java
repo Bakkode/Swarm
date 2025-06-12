@@ -48,6 +48,7 @@ public interface Context extends NativeResources {
      *                 definition of {@link Program}.
      * @return A {@link Module}.
      */
+    @SuppressWarnings("unchecked")
     Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException;
 
     /**
@@ -95,7 +96,7 @@ public interface Context extends NativeResources {
      * @throws SwarmException
      * @throws DeallocatedException
      */
-    void launch(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException;
+    void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException;
 
     /**
      * Launch kernel and return immediately. Don't forget to call
@@ -107,7 +108,7 @@ public interface Context extends NativeResources {
      * @throws SwarmException
      * @throws DeallocatedException
      */
-    void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException;
+    void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException;
 
     // ==== buffer memory management ====
 
@@ -131,6 +132,7 @@ public interface Context extends NativeResources {
      * @throws SwarmException
      * @throws DeallocatedException
      */
+    @SuppressWarnings("unchecked")
     void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws SwarmException, DeallocatedException;
 
     /**

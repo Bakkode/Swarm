@@ -21,9 +21,30 @@ import sun.misc.Unsafe;
  * extension of 64 bit indexing for extremely large dataset and unchecked bound
  * for high performance purpose
  */
-public abstract class Vector<T extends Number> implements NativeResources, List<T> {
+public abstract class Vector<T extends Number> extends Number implements NativeResources, List<T> {
 
-    protected static final Unsafe memAlloc = Common.getMemoryManagement();
+    @Override
+    public int intValue() {
+        return (int) longValue();
+    }
+
+    @Override
+    public long longValue() {
+        return getNativeAddress();
+    }
+
+    @Override
+    public float floatValue() {
+        return longValue();
+    }
+
+    @Override
+    public double doubleValue() {
+        return longValue();
+    }
+
+    private static final long     serialVersionUID = 7218315256186068889L;
+    protected static final Unsafe memAlloc         = Common.getMemoryManagement();
 
     protected class VectorDeallocator implements Deallocator {
         protected long cacheAddress;
@@ -64,7 +85,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
 
     public long getValueSize() { return this.size_t; }
 
-    protected Vector(long lBound, long uBound, long size_t, long bit_t) {
+    Vector(long lBound, long uBound, long size_t, long bit_t) {
         this.size_t = size_t;
         this.bit_t  = bit_t;
 
@@ -78,7 +99,7 @@ public abstract class Vector<T extends Number> implements NativeResources, List<
         this.deallocator = null;
     }
 
-    protected Vector(long size, boolean aligned, long size_t, long bit_t) {
+    Vector(long size, boolean aligned, long size_t, long bit_t) {
         final long sz     = size * size_t;
         final long origin = memAlloc.allocateMemory(sz + (aligned ? (size_t - 1) : 0));
 
