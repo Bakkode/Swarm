@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include <iostream>
+
 using namespace std;
 
 JNIEXPORT jstring JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclGetVersion
@@ -292,6 +294,8 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclG
 
     env->ReleaseStringUTFChars(jkName, kernelName);
 
+    std::cout << "huf" << endl;
+
     return reinterpret_cast<jlong>(ret);
 }
 
@@ -316,18 +320,22 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     jlong kernel, jlong queue,
     jint x, jint y, jint z,
     jint lx, jint ly, jint lz,
-    jlongArray arguments, jint count) {
+    jlongArray arguments,jintArray argRef, jint count) {
+
+
+    std::cout << "Launched" << endl;
 
     jlong* elements = env->GetLongArrayElements(arguments, nullptr);
-    jlong* sizes = env->GetLongArrayElements(arguments, nullptr);
+    jint*  sizes    = env->GetIntArrayElements(argRef, nullptr);
 
     for (unsigned int i = 0; i < count; i++) {
-        cl_int err = clSetKernelArg(reinterpret_cast<cl_kernel>(kernel), i, 8, reinterpret_cast<void*>(&elements[i]));
+        cl_int err = clSetKernelArg(reinterpret_cast<cl_kernel>(kernel), i, static_cast<size_t>(sizes[i]), reinterpret_cast<void*>(&elements[i]));
 
         if (err != CL_SUCCESS) { 
             env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
-            env->ReleaseLongArrayElements(arguments, sizes, JNI_ABORT);
+            env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
 
+            std::cout << "ini error: " << count << " = " << err << endl;
             return;
         }
     }
@@ -338,7 +346,9 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     cl_uint err = clEnqueueNDRangeKernel(reinterpret_cast<cl_command_queue>(queue), reinterpret_cast<cl_kernel>(kernel), 3, NULL, globalSize, localSize, 0, NULL, NULL);
  
     env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
-    env->ReleaseLongArrayElements(arguments, sizes, JNI_ABORT);
+    env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
+
+    std::cout << "ini error: " << err << endl;
 
     return;
 }

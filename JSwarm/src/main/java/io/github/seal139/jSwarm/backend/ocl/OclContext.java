@@ -200,33 +200,35 @@ public class OclContext implements Context {
             throw new SwarmException("Local Worksize excedeed maximum thread");
         }
 
-        long[] args = new long[arguments.length];
+        long[] args   = new long[arguments.length];
+        int[]  argRef = new int[arguments.length];
 
         {
             final int size = arguments.length;
             for (int i = 0; i < size; i++) {
                 if (arguments[i] instanceof Vector v) {
-                    args[i] = v.getBufferAddress(this);
+                    args[i]   = v.getBufferAddress(this);
+                    argRef[i] = 8;
                 }
                 else if (arguments[i] instanceof Double d) {
-                    args[i] = Double.doubleToRawLongBits(d.doubleValue());
+                    args[i]   = Double.doubleToRawLongBits(d.doubleValue());
+                    argRef[i] = 8;
                 }
                 else if (arguments[i] instanceof Float f) {
-                    args[i] = Float.floatToRawIntBits(f.floatValue());
+                    args[i]   = Float.floatToRawIntBits(f.floatValue());
+                    argRef[i] = 4;
                 }
                 else if (arguments[i] instanceof Long l) {
-                    args[i] = l.longValue();
+                    args[i]   = l.longValue();
+                    argRef[i] = 8;
                 }
                 else if (arguments[i] instanceof Short s) {
-                    long ll = s.shortValue();
-
-                    // Fill for MSB and LSB for endian-safe system
-                    args[i] |= ll;
-                    args[i] |= ll << 48;
+                    args[i]   = s.shortValue();
+                    argRef[i] = 2;
                 }
                 else {
-                    long l = arguments[i].intValue();
-                    args[i] = (l << 32) | l; // Fill for MSB and LSB for endian-safe system
+                    args[i]   = arguments[i].intValue();
+                    argRef[i] = 4;
                 }
             }
 
@@ -235,7 +237,7 @@ public class OclContext implements Context {
         OclDriver.oclLaunch(((OclKernel) kernel).getAddress(), hitQueueIndex(), //
                 ndRange.getXGlobal() * ndRange.getXLocal(), ndRange.getYGlobal() * ndRange.getYLocal(), ndRange.getZGlobal() * ndRange.getZLocal(), //
                 ndRange.getXLocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
-                args, args.length);
+                args, argRef, args.length);
     }
 
     // ==== buffer memory management ====

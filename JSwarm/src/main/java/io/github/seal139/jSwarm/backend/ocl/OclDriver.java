@@ -73,7 +73,7 @@ public final class OclDriver {
     static native void oclLaunch(long kernel, long queue, //
                                  int x, int y, int z, //
                                  int lx, int ly, int lz, //
-                                 long[] arguments, int count); // Ok
+                                 long[] arguments, int[] argRef, int count); // Ok
 
     // ==== buffer memory management ====
 

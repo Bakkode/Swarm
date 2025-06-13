@@ -227,15 +227,10 @@ public class CudaContext implements Context {
                     args[i] = l.longValue();
                 }
                 else if (arguments[i] instanceof Short s) {
-                    long ll = s.shortValue();
-
-                    // Fill for MSB and LSB for endian-safe system
-                    args[i] |= ll;
-                    args[i] |= ll << 48;
+                    args[i] = s.shortValue();
                 }
                 else {
-                    long l = arguments[i].intValue();
-                    args[i] = (l << 32) | l; // Fill for MSB and LSB for endian-safe system
+                    args[i] = arguments[i].intValue();
                 }
             }
         }
