@@ -1,5 +1,7 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
+import io.github.seal139.jSwarm.misc.Common;
+
 /**
  * Driver native API <br/>
  * <br/>
@@ -24,8 +26,7 @@ final class CudaDriver {
         Throwable t = null;
 
         try {
-//            System.load(Common.getDriverByOs(PLATFORM, "cudriver"));
-            System.load("C:\\wsl\\Programming\\Swarm\\C\\swarmcu\\out\\build\\x64-release\\swarmcu.dll");
+            System.load(Common.getDriverByOs(PLATFORM, "swarmcu.dll"));
             b = true;
         }
         catch (Throwable e) {
