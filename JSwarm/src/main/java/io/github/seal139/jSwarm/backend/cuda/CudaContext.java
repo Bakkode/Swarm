@@ -167,7 +167,6 @@ public class CudaContext implements Context {
         }
     }
 
-    @Override
     @SuppressWarnings("unchecked")
     public Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException {
         if (isClosed()) {
@@ -178,7 +177,6 @@ public class CudaContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
     public Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
@@ -188,7 +186,6 @@ public class CudaContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
     public Module loadProgram(String program) throws SwarmException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();

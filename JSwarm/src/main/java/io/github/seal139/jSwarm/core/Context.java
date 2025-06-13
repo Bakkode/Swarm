@@ -1,7 +1,5 @@
 package io.github.seal139.jSwarm.core;
 
-import java.util.Collection;
-
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources;
@@ -41,37 +39,8 @@ public interface Context extends NativeResources {
     Module loadProgram(Class<? extends Program> program) throws SwarmException, DeallocatedException;
 
     /**
-     * Load a {@link Class} of {@link Program} from a variadic (varargs) array. This
-     * will combine each {@link Program} into a {@link Module}.
-     *
-     * @param programs A variadic (varargs) array that holds {@link Class}
-     *                 definition of {@link Program}.
-     * @return A {@link Module}.
-     */
-    @SuppressWarnings("unchecked")
-    Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException;
-
-    /**
-     * Load a {@link Class} of {@link Program} from {@link Collection}. This will
-     * combine each {@link Program} into a {@link Module}.
-     *
-     * @param programs A {@link Collection} that holds {@link Class} definition of
-     *                 {@link Program}.
-     * @return A {@link Module}.
-     */
-    Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException;
-
-    /**
-     * Load program by source.
-     *
-     * @param program Source code.
-     * @return {@link Module}.
-     */
-    Module loadProgram(String program) throws SwarmException, DeallocatedException;
-
-    /**
      * Get the maximum number of concurrent operations at once. By default this
-     * value is 4.
+     * value is 4 or less (based on maximum supported by the platform).
      *
      * @return the maximum number of concurrent operations in parallel.
      */

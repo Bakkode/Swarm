@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include <iostream>
-
 using namespace std;
 
 JNIEXPORT jstring JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclGetVersion
@@ -294,8 +292,6 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclG
 
     env->ReleaseStringUTFChars(jkName, kernelName);
 
-    std::cout << "huf" << endl;
-
     return reinterpret_cast<jlong>(ret);
 }
 
@@ -322,9 +318,6 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     jint lx, jint ly, jint lz,
     jlongArray arguments,jintArray argRef, jint count) {
 
-
-    std::cout << "Launched" << endl;
-
     jlong* elements = env->GetLongArrayElements(arguments, nullptr);
     jint*  sizes    = env->GetIntArrayElements(argRef, nullptr);
 
@@ -334,8 +327,7 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
         if (err != CL_SUCCESS) { 
             env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
             env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
-
-            std::cout << "ini error: " << count << " = " << err << endl;
+            
             return;
         }
     }
@@ -347,8 +339,6 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
  
     env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
     env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
-
-    std::cout << "ini error: " << err << endl;
 
     return;
 }

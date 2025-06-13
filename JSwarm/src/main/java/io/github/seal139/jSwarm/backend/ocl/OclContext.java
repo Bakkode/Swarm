@@ -1,5 +1,6 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -16,6 +17,7 @@ import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
 import io.github.seal139.jSwarm.misc.NativeCleaner;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.transpiler.Decompiler;
 import sun.misc.Unsafe;
 
 public class OclContext implements Context {
@@ -154,11 +156,14 @@ public class OclContext implements Context {
             throw new DeallocatedException();
         }
 
-        String src = "";
-        return loadProgram(src);
+        try {
+            return loadProgram(Decompiler.process(new OclTranspiler(), program));
+        }
+        catch (IOException e) {
+            throw new SwarmException(e.getMessage());
+        }
     }
 
-    @Override
     @SuppressWarnings("unchecked")
     public Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException {
         if (isClosed()) {
@@ -169,7 +174,6 @@ public class OclContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
     public Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
@@ -179,7 +183,6 @@ public class OclContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
     public Module loadProgram(String program) throws SwarmException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
