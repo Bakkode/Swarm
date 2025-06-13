@@ -327,7 +327,7 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
         if (err != CL_SUCCESS) { 
             env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
             env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
-            
+
             return;
         }
     }
