@@ -1,8 +1,11 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.backend;
 
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.misc.NativeCleaner.NativeResources;
+import io.github.seal139.jSwarm.runtime.NdRange;
+import io.github.seal139.jSwarm.runtime.Program;
+import io.github.seal139.jSwarm.runtime.SyncDirection;
 
 /**
  * Represent execution context. In terms of GPGPU, Context plays a crucial parts
@@ -19,9 +22,9 @@ public interface Context extends NativeResources {
      * {@link Thread} that uses the same {@link Context} but only one active
      * {@link Context} every {@link Thread} is permitted.
      *
-     * @throws SwarmException
+     * @throws BackendException
      */
-    void activate() throws SwarmException;
+    void activate() throws BackendException;
 
     /**
      * Get the {@link Executor Device} associated with this context.
@@ -36,7 +39,7 @@ public interface Context extends NativeResources {
      * @param program A {@link Class} of {@link Program}.
      * @return A {@link Module}.
      */
-    Module loadProgram(Class<? extends Program> program) throws SwarmException, DeallocatedException;
+    Module loadProgram(Class<? extends Program> program) throws BackendException, DeallocatedException;
 
     /**
      * Get the maximum number of concurrent operations at once. By default this
@@ -53,7 +56,7 @@ public interface Context extends NativeResources {
      *
      * @param additionalNumber Number of added parallelism.
      */
-    void addParallelismLevel(int additionalNumber) throws SwarmException, DeallocatedException;
+    void addParallelismLevel(int additionalNumber) throws BackendException, DeallocatedException;
 
     // ==== Launcher ====
     /**
@@ -62,10 +65,10 @@ public interface Context extends NativeResources {
      * @param kernel    Valid {@link Kernel} that belongs to this {@link Context}
      * @param ndRange   Used working size per dimension
      * @param arguments Data to be processed and the output
-     * @throws SwarmException
+     * @throws BackendException
      * @throws DeallocatedException
      */
-    void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException;
+    void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException;
 
     /**
      * Launch kernel and return immediately. Don't forget to call
@@ -74,10 +77,10 @@ public interface Context extends NativeResources {
      * @param kernel    Valid {@link Kernel} that belongs to this {@link Context}
      * @param ndRange   Used working size per dimension
      * @param arguments Data to be processed and the output
-     * @throws SwarmException
+     * @throws BackendException
      * @throws DeallocatedException
      */
-    void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException;
+    void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException;
 
     // ==== buffer memory management ====
 
@@ -87,9 +90,9 @@ public interface Context extends NativeResources {
      * {@link Vector}
      *
      * @param vector Any valid {@link Vector} or it's derivatives.
-     * @throws SwarmException
+     * @throws BackendException
      */
-    void hook(Vector<? extends Number> vector) throws SwarmException;
+    void hook(Vector<? extends Number> vector) throws BackendException;
 
     /**
      * Synchronized {@link #hook hooked} {@link Vector} between host and device
@@ -98,35 +101,35 @@ public interface Context extends NativeResources {
      * @param direction      Sync direction
      * @param dataCollection Any valid {@link Vector} or it's derivatives to be
      *                       synchronized.
-     * @throws SwarmException
+     * @throws BackendException
      * @throws DeallocatedException
      */
     @SuppressWarnings("unchecked")
-    void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws SwarmException, DeallocatedException;
+    void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws BackendException, DeallocatedException;
 
     /**
      * Unhook {@link Vector} if no more synchronization is needed and release
      * resources used by device
      *
      * @param vector
-     * @throws SwarmException
+     * @throws BackendException
      */
-    void unhook(Vector<? extends Number> vector) throws SwarmException;
+    void unhook(Vector<? extends Number> vector) throws BackendException;
 
     /**
      * Re-initialized device memory. This is should be called if referenced
      * {@link Vector} {@link Vector#size() size} is changed.
      *
      * @param vector referenced {@link Vector}
-     * @throws SwarmException
+     * @throws BackendException
      */
-    void reHook(Vector<? extends Number> vector) throws SwarmException;
+    void reHook(Vector<? extends Number> vector) throws BackendException;
 
     /**
      * Wait for pending operation to be done.
      *
-     * @throws SwarmException
+     * @throws BackendException
      * @throws DeallocatedException
      */
-    void waitOperation() throws SwarmException, DeallocatedException;
+    void waitOperation() throws BackendException, DeallocatedException;
 }

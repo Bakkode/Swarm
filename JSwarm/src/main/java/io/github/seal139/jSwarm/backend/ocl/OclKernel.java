@@ -1,6 +1,6 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
-import io.github.seal139.jSwarm.core.Kernel;
+import io.github.seal139.jSwarm.backend.Kernel;
 import io.github.seal139.jSwarm.misc.Common;
 import sun.misc.Unsafe;
 

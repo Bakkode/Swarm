@@ -1,7 +1,7 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
-import io.github.seal139.jSwarm.core.Executor;
-import io.github.seal139.jSwarm.core.Platform;
+import io.github.seal139.jSwarm.backend.Executor;
+import io.github.seal139.jSwarm.backend.Platform;
 import io.github.seal139.jSwarm.misc.Common;
 import sun.misc.Unsafe;
 

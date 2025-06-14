@@ -1,11 +1,11 @@
 package io.github.seal139.jSwarm.backend.cuda;
 
-import io.github.seal139.jSwarm.core.SwarmException;
+import io.github.seal139.jSwarm.backend.BackendException;
 
 /**
  * CUDA-related exception
  */
-public final class CudaException extends SwarmException {
+public final class CudaException extends BackendException {
 
     private static final long serialVersionUID = -3271554093353725232L;
 

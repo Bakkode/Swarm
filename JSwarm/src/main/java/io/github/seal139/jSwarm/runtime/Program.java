@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.runtime;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

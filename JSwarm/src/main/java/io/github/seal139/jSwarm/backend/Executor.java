@@ -1,4 +1,6 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.backend;
+
+import io.github.seal139.jSwarm.runtime.DeviceType;
 
 /**
  * Represent device hardware.
@@ -10,7 +12,7 @@ public interface Executor {
      *
      * @return Default managed {@link Context}.
      */
-    Context getDefaultContext() throws SwarmException;
+    Context getDefaultContext() throws BackendException;
 
     /**
      * Get the type of the hardware device used by this Executor.

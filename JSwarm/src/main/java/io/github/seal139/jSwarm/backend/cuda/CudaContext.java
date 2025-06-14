@@ -5,18 +5,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import io.github.seal139.jSwarm.core.Context;
-import io.github.seal139.jSwarm.core.Kernel;
-import io.github.seal139.jSwarm.core.Module;
-import io.github.seal139.jSwarm.core.NdRange;
-import io.github.seal139.jSwarm.core.Program;
-import io.github.seal139.jSwarm.core.SwarmException;
-import io.github.seal139.jSwarm.core.SyncDirection;
+import io.github.seal139.jSwarm.backend.BackendException;
+import io.github.seal139.jSwarm.backend.Context;
+import io.github.seal139.jSwarm.backend.Kernel;
+import io.github.seal139.jSwarm.backend.Module;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
 import io.github.seal139.jSwarm.misc.NativeCleaner;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.runtime.NdRange;
+import io.github.seal139.jSwarm.runtime.Program;
+import io.github.seal139.jSwarm.runtime.SyncDirection;
 import io.github.seal139.jSwarm.transpiler.Decompiler;
 import sun.misc.Unsafe;
 
@@ -111,7 +111,7 @@ public class CudaContext implements Context {
     public CudaDevice getDevice() { return this.device; }
 
     @Override
-    public void activate() throws SwarmException {
+    public void activate() throws BackendException {
         int err = CudaDriver.cudaSetContext(getAddress());
 
         if (err != 0) {
@@ -154,7 +154,7 @@ public class CudaContext implements Context {
     }
 
     @Override
-    public Module loadProgram(Class<? extends Program> program) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Class<? extends Program> program) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -163,12 +163,12 @@ public class CudaContext implements Context {
             return loadProgram(Decompiler.process(new CudaTranspiler(), program));
         }
         catch (IOException e) {
-            throw new SwarmException(e.getMessage());
+            throw new BackendException(e.getMessage());
         }
     }
 
     @SuppressWarnings("unchecked")
-    public Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Class<? extends Program>... programs) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -177,7 +177,7 @@ public class CudaContext implements Context {
         return loadProgram(src);
     }
 
-    public Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Collection<Class<? extends Program>> programs) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -186,7 +186,7 @@ public class CudaContext implements Context {
         return loadProgram(src);
     }
 
-    public Module loadProgram(String program) throws SwarmException, DeallocatedException {
+    public Module loadProgram(String program) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -195,15 +195,15 @@ public class CudaContext implements Context {
     }
 
     @Override
-    public void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException {
+    public void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         launchAsync(kernel, ndRange, arguments);
         waitOperation();
     }
 
     @Override
-    public void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws SwarmException, DeallocatedException {
+    public void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         if (this.device.getMaxLocalThread() < (ndRange.getXLocal() * ndRange.getYLocal() * ndRange.getZLocal())) {
-            throw new SwarmException("Local Worksize excedeed maximum thread");
+            throw new BackendException("Local Worksize excedeed maximum thread");
         }
 
         long[] args = new long[arguments.length];

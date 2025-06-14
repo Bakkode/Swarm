@@ -17,9 +17,9 @@ import org.antlr.v4.runtime.tree.RuleNode;
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.api.OutputSinkFactory;
 
-import io.github.seal139.jSwarm.core.Program;
-import io.github.seal139.jSwarm.core.SwarmException;
-import io.github.seal139.jSwarm.core.TranspileException;
+import io.github.seal139.jSwarm.backend.BackendException;
+import io.github.seal139.jSwarm.runtime.Program;
+import io.github.seal139.jSwarm.runtime.TranspileException;
 
 /**
  * Decompile Java byte code into generic source
@@ -79,7 +79,7 @@ public final class Decompiler {
 
     private static final CfrDriver decompilerDriver = new CfrDriver.Builder().withOutputSink(JDecompiler.getInstance()).build();
 
-    public static String process(JParserBaseListener transpiler, Class<? extends Program> cls) throws SwarmException, IOException {
+    public static String process(JParserBaseListener transpiler, Class<? extends Program> cls) throws BackendException, IOException {
         final StringBuilder sb = new StringBuilder();
 
         decompile(sb, cls);
@@ -88,7 +88,7 @@ public final class Decompiler {
     }
 
     @SuppressWarnings("unchecked")
-    public static String process(JParserBaseListener transpiler, Class<? extends Program>... clss) throws SwarmException, IOException {
+    public static String process(JParserBaseListener transpiler, Class<? extends Program>... clss) throws BackendException, IOException {
         final StringBuilder sb = new StringBuilder("");
 
         for (Class<? extends Program> cls : clss) {
@@ -98,7 +98,7 @@ public final class Decompiler {
         return buildAst(sb.toString(), transpiler);
     }
 
-    public static String process(JParserBaseListener transpiler, Collection<Class<? extends Program>> clss) throws SwarmException, IOException {
+    public static String process(JParserBaseListener transpiler, Collection<Class<? extends Program>> clss) throws BackendException, IOException {
         final StringBuilder sb = new StringBuilder("");
 
         for (Class<? extends Program> cls : clss) {
@@ -108,7 +108,7 @@ public final class Decompiler {
         return buildAst(sb.toString(), transpiler);
     }
 
-    protected static void decompile(StringBuilder sb, Class<? extends Program> cls) throws SwarmException, IOException {
+    protected static void decompile(StringBuilder sb, Class<? extends Program> cls) throws BackendException, IOException {
         File f = null;
         try {
             f = File.createTempFile("swarm-", ".kernel");

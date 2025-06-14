@@ -1,4 +1,6 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.runtime;
+
+import io.github.seal139.jSwarm.backend.Executor;
 
 /**
  * Define work size for kernel

@@ -1,11 +1,11 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
-import io.github.seal139.jSwarm.core.SwarmException;
+import io.github.seal139.jSwarm.backend.BackendException;
 
 /**
  * CUDA-related exception
  */
-public final class OclException extends SwarmException {
+public final class OclException extends BackendException {
 
     private static final long serialVersionUID = -3271554093353725232L;
 

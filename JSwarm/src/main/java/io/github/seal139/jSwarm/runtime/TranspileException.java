@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.runtime;
 
 public class TranspileException extends RuntimeException {
 

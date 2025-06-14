@@ -3,7 +3,7 @@ package io.github.seal139.jSwarm.backend.cuda;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.github.seal139.jSwarm.core.Module;
+import io.github.seal139.jSwarm.backend.Module;
 import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
 import io.github.seal139.jSwarm.misc.NativeCleaner;
