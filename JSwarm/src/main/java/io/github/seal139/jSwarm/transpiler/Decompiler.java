@@ -150,6 +150,6 @@ public final class Decompiler {
             throw transpiler.getTranspileException();
         }
 
-        return transpiler.getAstResult();
+        return transpiler.getTranspiledSource();
     }
 }

@@ -50,8 +50,8 @@ import io.github.seal139.jSwarm.transpiler.JParser.UnaryExpressionNotPlusMinusCo
 import io.github.seal139.jSwarm.transpiler.JParser.VariableDeclaratorContext;
 import io.github.seal139.jSwarm.transpiler.JParser.WhileStatementContext;
 import io.github.seal139.jSwarm.transpiler.JParser.WhileStatementNoShortIfContext;
+import io.github.seal139.jSwarm.backend.Transpiler;
 import io.github.seal139.jSwarm.runtime.TranspileException;
-import io.github.seal139.jSwarm.runtime.Transpiler;
 import io.github.seal139.jSwarm.transpiler.JParserBaseListener;
 
 public final class OclTranspiler extends JParserBaseListener implements Transpiler {
@@ -59,7 +59,7 @@ public final class OclTranspiler extends JParserBaseListener implements Transpil
     private TranspileException e = null;
 
     @Override
-    public String getAstResult() { return this.sb.toString(); }
+    public String getTranspiledSource() { return this.sb.toString(); }
 
     @Override
     public TranspileException getTranspileException() { return this.e; }

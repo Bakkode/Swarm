@@ -6,7 +6,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import io.github.seal139.jSwarm.runtime.Transpiler;
+import io.github.seal139.jSwarm.backend.Transpiler;
 
 /**
  * This class provides an empty implementation of {@link JParserListener}, which
