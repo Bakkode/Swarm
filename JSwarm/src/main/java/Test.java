@@ -13,115 +13,15 @@ import io.github.seal139.jSwarm.backend.Kernel;
 import io.github.seal139.jSwarm.backend.Module;
 import io.github.seal139.jSwarm.backend.Platform;
 import io.github.seal139.jSwarm.backend.cuda.Cuda;
-import io.github.seal139.jSwarm.backend.cuda.CudaTranspiler;
-import io.github.seal139.jSwarm.backend.ocl.Ocl;
 import io.github.seal139.jSwarm.datatype.FloatVector;
-import io.github.seal139.jSwarm.datatype.IntVector;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.runtime.NdRange;
 import io.github.seal139.jSwarm.runtime.SyncDirection;
-import io.github.seal139.jSwarm.transpiler.Decompiler;
 
 public class Test {
 
-    public static void clTest() throws Error, Exception {
-
-        // __global for array parameter
-        String oclKernel = """
-                __kernel void vecAdd(__global float* a, __global float* b, __global float* c, float d) {
-                    int idx = get_global_id(0);
-                    if (idx < 5) {
-                        c[idx] = d * (a[idx] + b[idx]);
-                    }
-                }
-                    """;
-
-        Platform platform = Ocl.getInstance();
-
-        System.out.println(platform.getName() + " v" + platform.getVersion() + "\n");
-        for (Executor dev : platform.getDevices()) {
-
-            System.out.println(dev.getUuid() + ": " + dev.getName());
-            System.out.println(dev.getFlops() + " GFLOPS");
-            System.out.println("Compute Unit: " + String.valueOf(dev.getComputeUnit()));
-            System.out.println("Total Memory: " + String.valueOf(dev.getTotalMemory() / 1049000000) + "Gb");
-            System.out.println("NDRange: 3");
-            System.out.println("Max Global NDRange [" //
-                    + String.valueOf(dev.getMaxGlobalSize()[0]) + ", " //
-                    + String.valueOf(dev.getMaxGlobalSize()[1]) + ", " //
-                    + String.valueOf(dev.getMaxGlobalSize()[2]) + "]");
-
-            System.out.println("Max Local NDRange [" //
-                    + String.valueOf(dev.getMaxLocalSize()[0]) + ", " //
-                    + String.valueOf(dev.getMaxLocalSize()[1]) + ", " //
-                    + String.valueOf(dev.getMaxLocalSize()[2]) + "]");
-
-            System.out.println("Max Local Thread: " + String.valueOf(dev.getMaxLocalThread()));
-
-            System.out.println("\n");
-        }
-
-        Executor device = platform.getDevices()[0];
-
-        try {
-            Context ctx = device.getDefaultContext(); // ((CudaDevice) device).newContext();
-//            Context cetax = device.getDefaultContext();        //
-
-            ctx.activate();
-
-            Module module = ctx.loadProgram(ExampleKernel.class); //
-            //
-            Vector<Float>   i1 = new FloatVector(5, true); //
-            Vector<Float>   i2 = new FloatVector(5, true); //
-            Vector<Float>   o1 = new FloatVector(5, true); //
-            Vector<Integer> n  = new IntVector(1, true);
-
-            for (long i = 0; i < 5; i++) {
-                i1.set(i, (1 + i) * 1.0f);
-                i2.set(i, (6 + i) * 1.0f);
-            }
-            n.set(0L, 5);
-
-            ctx.hook(i1);
-            ctx.hook(i2);
-            ctx.hook(o1);
-            ctx.hook(n);
-
-            //
-
-            ctx.sync(SyncDirection.TO_DEVICE, i1, i2, n);
-            ctx.waitOperation();
-
-            Kernel addKernel = module.getKernel("vecAdd");
-            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, n, 2.64f);
-            ctx.waitOperation();
-
-            ctx.sync(SyncDirection.TO_HOST, o1);
-            ctx.waitOperation();
-
-            ctx.unhook(i1);
-            ctx.unhook(i2);
-            ctx.unhook(o1);
-
-            o1.forEach(v -> System.out.println(v));
-            System.out.println("End");
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     @SuppressWarnings("unchecked")
     public static void cudaTest() throws Error, Exception {
-        String cudaKernel = """
-                    extern "C" __global__ void vecAdd(const float* a, const float* b, float* c, const int* n, float d) {
-                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-                    if (idx < *n) {
-                        c[idx] = d + (a[idx] + b[idx]);
-                    }
-                }
-                """;
-
         Platform platform = Cuda.getInstance();
 
         System.out.println(platform.getName() + " v" + platform.getVersion() + "\n");
@@ -159,29 +59,26 @@ public class Test {
             Module module = ctx.loadProgram(ExampleKernel.class); //
 
             //
-            Vector<Float>   i1 = new FloatVector(5, true); //
-            Vector<Float>   i2 = new FloatVector(5, true); //
-            Vector<Float>   o1 = new FloatVector(5, true); //
-            Vector<Integer> n  = new IntVector(1, true);
+            Vector<Float> i1 = new FloatVector(5, true); //
+            Vector<Float> i2 = new FloatVector(5, true); //
+            Vector<Float> o1 = new FloatVector(5, true); //
 
             for (long i = 0; i < 5; i++) {
                 i1.set(i, (1 + i) * 1.0f);
                 i2.set(i, (6 + i) * 1.0f);
             }
-            n.set(0L, 5);
 
             ctx.hook(i1);
             ctx.hook(i2);
             ctx.hook(o1);
-            ctx.hook(n);
 
             //
 
-            ctx.sync(SyncDirection.TO_DEVICE, i1, i2, n);
+            ctx.sync(SyncDirection.TO_DEVICE, i1, i2);
             ctx.waitOperation();
 
             Kernel addKernel = module.getKernel("vecAdd");
-            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, n, 2.64f);
+            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, 5, 2.64f);
             ctx.waitOperation();
 
             ctx.sync(SyncDirection.TO_HOST, o1);
@@ -475,31 +372,6 @@ public class Test {
 
         // benchFloatArray();
         // writeFloatVector();
-
-        Test t = new Test();
-//
-        t.decompile();
-    }
-
-    public void decompile() throws Exception {
-
-        // ============
-
-//        String classPath = "/" + ExampleKernel.class.getName().replace('.', '/') + ".class";
-//
-//        Decompiler d = Decompiler.getDefault();
-//
-//        String s1 = d.process(List.of(ExampleKernel.class), this::processCuda);
-//
-//        System.out.println("\n\n\n============\n\n\n");
-
-        String classPath = "/" + ExampleKernel.class.getName().replace('.', '/') + ".class";
-
-        Decompiler d = new Decompiler();
-
-        System.out.println(Decompiler.process(new CudaTranspiler(), ExampleKernel.class));
-
-        System.out.println("\n\n\n============\n\n\n");
     }
 
     public String processCuda(String s) {

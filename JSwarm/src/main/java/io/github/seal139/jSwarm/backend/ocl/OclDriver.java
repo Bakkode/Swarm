@@ -1,5 +1,7 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
+import io.github.seal139.jSwarm.misc.Common;
+
 /**
  * Driver native API <br/>
  * <br/>
@@ -24,7 +26,7 @@ public final class OclDriver {
         Throwable t = null;
 
         try {
-            System.load("C:\\wsl\\Programming\\Swarm\\C\\swarmocl\\out\\build\\x64-release\\swarmocl.dll");
+            System.load(Common.getDriverByOs(PLATFORM, "swarmocl.dll"));
             // System.load(Common.getDriverByOs(PLATFORM, "swarmocl.dll"));
             b = true;
         }
