@@ -1,21 +1,23 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import io.github.seal139.jSwarm.core.Context;
-import io.github.seal139.jSwarm.core.Kernel;
-import io.github.seal139.jSwarm.core.Module;
-import io.github.seal139.jSwarm.core.NdRange;
-import io.github.seal139.jSwarm.core.Program;
-import io.github.seal139.jSwarm.core.SwarmException;
-import io.github.seal139.jSwarm.core.SyncDirection;
+import io.github.seal139.jSwarm.backend.BackendException;
+import io.github.seal139.jSwarm.backend.Context;
+import io.github.seal139.jSwarm.backend.Kernel;
+import io.github.seal139.jSwarm.backend.Module;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.Log;
 import io.github.seal139.jSwarm.misc.NativeCleaner;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
+import io.github.seal139.jSwarm.runtime.NdRange;
+import io.github.seal139.jSwarm.runtime.Program;
+import io.github.seal139.jSwarm.runtime.SyncDirection;
+import io.github.seal139.jSwarm.transpiler.Decompiler;
 import sun.misc.Unsafe;
 
 public class OclContext implements Context {
@@ -110,7 +112,7 @@ public class OclContext implements Context {
     public OclDevice getDevice() { return this.device; }
 
     @Override
-    public void activate() throws SwarmException {
+    public void activate() throws BackendException {
         this.ocl.setContext(this.getAddress());
     }
 
@@ -149,18 +151,21 @@ public class OclContext implements Context {
     }
 
     @Override
-    public Module loadProgram(Class<? extends Program> program) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Class<? extends Program> program) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
 
-        String src = "";
-        return loadProgram(src);
+        try {
+            return loadProgram(Decompiler.process(new OclTranspiler(), program));
+        }
+        catch (IOException e) {
+            throw new BackendException(e.getMessage());
+        }
     }
 
-    @Override
     @SuppressWarnings("unchecked")
-    public Module loadProgram(Class<? extends Program>... programs) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Class<? extends Program>... programs) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -169,8 +174,7 @@ public class OclContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
-    public Module loadProgram(Collection<Class<? extends Program>> programs) throws SwarmException, DeallocatedException {
+    public Module loadProgram(Collection<Class<? extends Program>> programs) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -179,8 +183,7 @@ public class OclContext implements Context {
         return loadProgram(src);
     }
 
-    @Override
-    public Module loadProgram(String program) throws SwarmException, DeallocatedException {
+    public Module loadProgram(String program) throws BackendException, DeallocatedException {
         if (isClosed()) {
             throw new DeallocatedException();
         }
@@ -189,25 +192,47 @@ public class OclContext implements Context {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void launch(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+    public void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         launchAsync(kernel, ndRange, arguments);
         waitOperation();
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void launchAsync(Kernel kernel, NdRange ndRange, Vector<? extends Number>... arguments) throws SwarmException, DeallocatedException {
+    public void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         if (this.device.getMaxLocalThread() < (ndRange.getXLocal() * ndRange.getYLocal() * ndRange.getZLocal())) {
-            throw new SwarmException("Local Worksize excedeed maximum thread");
+            throw new BackendException("Local Worksize excedeed maximum thread");
         }
 
-        long[] args = new long[arguments.length];
+        long[] args   = new long[arguments.length];
+        int[]  argRef = new int[arguments.length];
 
         {
             final int size = arguments.length;
             for (int i = 0; i < size; i++) {
-                args[i] = arguments[i].getBufferAddress(this);
+                if (arguments[i] instanceof Vector v) {
+                    args[i]   = v.getBufferAddress(this);
+                    argRef[i] = 8;
+                }
+                else if (arguments[i] instanceof Double d) {
+                    args[i]   = Double.doubleToRawLongBits(d.doubleValue());
+                    argRef[i] = 8;
+                }
+                else if (arguments[i] instanceof Float f) {
+                    args[i]   = Float.floatToRawIntBits(f.floatValue());
+                    argRef[i] = 4;
+                }
+                else if (arguments[i] instanceof Long l) {
+                    args[i]   = l.longValue();
+                    argRef[i] = 8;
+                }
+                else if (arguments[i] instanceof Short s) {
+                    args[i]   = s.shortValue();
+                    argRef[i] = 2;
+                }
+                else {
+                    args[i]   = arguments[i].intValue();
+                    argRef[i] = 4;
+                }
             }
 
         }
@@ -215,7 +240,7 @@ public class OclContext implements Context {
         OclDriver.oclLaunch(((OclKernel) kernel).getAddress(), hitQueueIndex(), //
                 ndRange.getXGlobal() * ndRange.getXLocal(), ndRange.getYGlobal() * ndRange.getYLocal(), ndRange.getZGlobal() * ndRange.getZLocal(), //
                 ndRange.getXLocal(), ndRange.getYLocal(), ndRange.getZLocal(), //
-                args, args.length);
+                args, argRef, args.length);
     }
 
     // ==== buffer memory management ====

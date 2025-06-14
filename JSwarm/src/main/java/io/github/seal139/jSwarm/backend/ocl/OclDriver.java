@@ -1,5 +1,7 @@
 package io.github.seal139.jSwarm.backend.ocl;
 
+import io.github.seal139.jSwarm.misc.Common;
+
 /**
  * Driver native API <br/>
  * <br/>
@@ -24,8 +26,8 @@ public final class OclDriver {
         Throwable t = null;
 
         try {
-//            System.load(Common.getDriverByOs(PLATFORM, "cudriver"));
-            System.load("C:\\wsl\\Programming\\Swarm\\C\\swarmocl\\out\\build\\x64-release\\swarmocl.dll");
+            System.load(Common.getDriverByOs(PLATFORM, "swarmocl.dll"));
+            // System.load(Common.getDriverByOs(PLATFORM, "swarmocl.dll"));
             b = true;
         }
         catch (Throwable e) {
@@ -73,7 +75,7 @@ public final class OclDriver {
     static native void oclLaunch(long kernel, long queue, //
                                  int x, int y, int z, //
                                  int lx, int ly, int lz, //
-                                 long[] arguments, int count); // Ok
+                                 long[] arguments, int[] argRef, int count); // Ok
 
     // ==== buffer memory management ====
 

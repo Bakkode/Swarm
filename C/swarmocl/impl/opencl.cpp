@@ -55,7 +55,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclE
 
     // Get number of OpenCL platforms
     cl_uint numPlatforms;
-    cl_int err = clGetPlatformIDs(0, NULL, &numPlatforms);
+    cl_uint err = clGetPlatformIDs(0, NULL, &numPlatforms);
     if (err != CL_SUCCESS) {
         jint* ret = new jint[1];
         ret[0] = err;
@@ -111,7 +111,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclE
         // Fill the device pointer
         ret[0] = clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, numDevices, reinterpret_cast<cl_device_id*>(&ret[2 + offset]), NULL);
 
-        if (ret[0] == CL_SUCCESS) {
+        if (static_cast<cl_int>(ret[0]) == CL_SUCCESS) {
             offset += numDevices;
             continue;
         }
@@ -182,7 +182,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclC
     // Create device context
     ret[1] = reinterpret_cast<jlong>(clCreateContext(NULL, 1, reinterpret_cast<cl_device_id*>(&device), NULL, NULL, reinterpret_cast<cl_int*>(&ret[0])));
 
-    if (ret[0] != CL_SUCCESS) {
+    if (static_cast<cl_int>(ret[0]) != CL_SUCCESS) {
         clReleaseContext(reinterpret_cast<cl_context>(ret[1]));
         return reinterpret_cast<jlong>(ret);
     }
@@ -191,7 +191,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclC
     for (int i = 0; i < 4; i++) {
         ret[2 + i] = reinterpret_cast<jlong>(clCreateCommandQueue(reinterpret_cast<cl_context>(ret[1]), reinterpret_cast<cl_device_id>(device), 0, reinterpret_cast<cl_int*>(&ret[0])));
 
-        if (ret[0] == CL_SUCCESS) {
+        if (static_cast<cl_int>(ret[0]) == CL_SUCCESS) {
             continue;
         }
         
@@ -220,7 +220,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclA
     for (int i = 0; i < count; i++) {
         ret[1 + i] = reinterpret_cast<jlong>(clCreateCommandQueue(reinterpret_cast<cl_context>(context), reinterpret_cast<cl_device_id>(device), 0, reinterpret_cast<cl_int*>(&ret[0])));
        
-        if (ret[0] == CL_SUCCESS) {            
+        if (static_cast<cl_int>(ret[0]) == CL_SUCCESS) {
             continue;
         }
 
@@ -259,12 +259,15 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclC
    
     ret[1] = reinterpret_cast<jlong>(clCreateProgramWithSource(reinterpret_cast<cl_context>(context), 1, &src, NULL, reinterpret_cast<cl_int*>(&ret[0])));
 
-    if ((cl_int)ret[0] != CL_SUCCESS) {
+    if (static_cast<cl_uint>(ret[0]) != CL_SUCCESS) {
+        
+        env->ReleaseStringUTFChars(jsrc, src);
         return reinterpret_cast<jlong>(ret);
     }
 
     ret[0] = clBuildProgram(reinterpret_cast<cl_program>(ret[1]), 1, reinterpret_cast<cl_device_id*>(&device), NULL, NULL, NULL);
-    if (ret[0] != CL_SUCCESS) {
+    if (static_cast<cl_uint>(ret[0]) != CL_SUCCESS) {
+
 
         size_t logSize;
         clGetProgramBuildInfo(reinterpret_cast<cl_program>(ret[1]), reinterpret_cast<cl_device_id>(device), CL_PROGRAM_BUILD_LOG, 0, NULL, &logSize);
@@ -274,6 +277,7 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclC
         clReleaseProgram(reinterpret_cast<cl_program>(ret[1]));
     }
 
+    env->ReleaseStringUTFChars(jsrc, src);
     return reinterpret_cast<jlong>(ret);
 }
 
@@ -316,17 +320,17 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     jlong kernel, jlong queue,
     jint x, jint y, jint z,
     jint lx, jint ly, jint lz,
-    jlongArray arguments, jint count) {
+    jlongArray arguments,jintArray argRef, jint count) {
 
     jlong* elements = env->GetLongArrayElements(arguments, nullptr);
-    jlong* sizes = env->GetLongArrayElements(arguments, nullptr);
+    jint*  sizes    = env->GetIntArrayElements(argRef, nullptr);
 
     for (unsigned int i = 0; i < count; i++) {
-        cl_int err = clSetKernelArg(reinterpret_cast<cl_kernel>(kernel), i, 8, reinterpret_cast<void*>(&elements[i]));
+        cl_uint err = clSetKernelArg(reinterpret_cast<cl_kernel>(kernel), i, static_cast<size_t>(sizes[i]), reinterpret_cast<void*>(&elements[i]));
 
         if (err != CL_SUCCESS) { 
             env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
-            env->ReleaseLongArrayElements(arguments, sizes, JNI_ABORT);
+            env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
 
             return;
         }
@@ -338,7 +342,7 @@ JNIEXPORT void JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclLa
     cl_uint err = clEnqueueNDRangeKernel(reinterpret_cast<cl_command_queue>(queue), reinterpret_cast<cl_kernel>(kernel), 3, NULL, globalSize, localSize, 0, NULL, NULL);
  
     env->ReleaseLongArrayElements(arguments, elements, JNI_ABORT);
-    env->ReleaseLongArrayElements(arguments, sizes, JNI_ABORT);
+    env->ReleaseIntArrayElements(argRef, sizes, JNI_ABORT);
 
     return;
 }

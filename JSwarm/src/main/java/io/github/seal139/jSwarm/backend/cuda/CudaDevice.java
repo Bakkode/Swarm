@@ -2,9 +2,9 @@ package io.github.seal139.jSwarm.backend.cuda;
 
 import java.util.UUID;
 
-import io.github.seal139.jSwarm.core.DeviceType;
-import io.github.seal139.jSwarm.core.Executor;
+import io.github.seal139.jSwarm.backend.Executor;
 import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.runtime.DeviceType;
 import sun.misc.Unsafe;
 
 public class CudaDevice implements Executor {

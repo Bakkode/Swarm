@@ -1,4 +1,4 @@
-package io.github.seal139.jSwarm.core;
+package io.github.seal139.jSwarm.wrapper;
 
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import io.github.seal139.jSwarm.backend.Executor;
+import io.github.seal139.jSwarm.backend.Platform;
 import io.github.seal139.jSwarm.backend.cuda.Cuda;
 import io.github.seal139.jSwarm.misc.Common;
 
