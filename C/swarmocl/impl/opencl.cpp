@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include <iostream>
-
 using namespace std;
 
 JNIEXPORT jstring JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclGetVersion
@@ -260,7 +258,6 @@ JNIEXPORT jlong JNICALL Java_io_github_seal139_jSwarm_backend_ocl_OclDriver_oclC
     jlong* ret = new jlong[2];
    
     ret[1] = reinterpret_cast<jlong>(clCreateProgramWithSource(reinterpret_cast<cl_context>(context), 1, &src, NULL, reinterpret_cast<cl_int*>(&ret[0])));
-    std::cout << "must be here" << std::endl;
 
     if (static_cast<cl_uint>(ret[0]) != CL_SUCCESS) {
         
