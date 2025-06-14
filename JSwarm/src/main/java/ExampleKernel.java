@@ -1,8 +1,8 @@
 import java.util.concurrent.CyclicBarrier;
 
-import io.github.seal139.jSwarm.core.Program;
 import io.github.seal139.jSwarm.datatype.FloatVector;
 import io.github.seal139.jSwarm.datatype.IntVector;
+import io.github.seal139.jSwarm.runtime.Program;
 
 public final class ExampleKernel extends Program {
 

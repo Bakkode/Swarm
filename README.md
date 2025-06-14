@@ -15,5 +15,3 @@ Swarm is designed to bridge the gap between the Java programming environment and
 - 📋 Automatic error handling
 - 🔄 Reusable memory and kernel caching
 - 🧬 Custom vector data types (`FloatVector`, `IntVector`, etc.)
-
----

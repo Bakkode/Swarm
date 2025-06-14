@@ -7,26 +7,24 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
+import io.github.seal139.jSwarm.backend.Context;
+import io.github.seal139.jSwarm.backend.Executor;
+import io.github.seal139.jSwarm.backend.Kernel;
+import io.github.seal139.jSwarm.backend.Module;
+import io.github.seal139.jSwarm.backend.Platform;
 import io.github.seal139.jSwarm.backend.cuda.Cuda;
 import io.github.seal139.jSwarm.backend.cuda.CudaTranspiler;
 import io.github.seal139.jSwarm.backend.ocl.Ocl;
-import io.github.seal139.jSwarm.core.Context;
-import io.github.seal139.jSwarm.core.Executor;
-import io.github.seal139.jSwarm.core.Kernel;
-import io.github.seal139.jSwarm.core.Module;
-import io.github.seal139.jSwarm.core.NativeException;
-import io.github.seal139.jSwarm.core.NdRange;
-import io.github.seal139.jSwarm.core.Platform;
-import io.github.seal139.jSwarm.core.SwarmException;
-import io.github.seal139.jSwarm.core.SyncDirection;
 import io.github.seal139.jSwarm.datatype.FloatVector;
 import io.github.seal139.jSwarm.datatype.IntVector;
 import io.github.seal139.jSwarm.datatype.Vector;
+import io.github.seal139.jSwarm.runtime.NdRange;
+import io.github.seal139.jSwarm.runtime.SyncDirection;
 import io.github.seal139.jSwarm.transpiler.Decompiler;
 
 public class Test {
 
-    public static void clTest() throws Error, SwarmException, Exception {
+    public static void clTest() throws Error, Exception {
 
         // __global for array parameter
         String oclKernel = """
@@ -71,7 +69,7 @@ public class Test {
 
             ctx.activate();
 
-            Module module = ctx.loadProgram(oclKernel); //
+            Module module = ctx.loadProgram(ExampleKernel.class); //
             //
             Vector<Float>   i1 = new FloatVector(5, true); //
             Vector<Float>   i2 = new FloatVector(5, true); //
@@ -114,7 +112,7 @@ public class Test {
     }
 
     @SuppressWarnings("unchecked")
-    public static void cudaTest() throws Error, SwarmException, Exception {
+    public static void cudaTest() throws Error, Exception {
         String cudaKernel = """
                     extern "C" __global__ void vecAdd(const float* a, const float* b, float* c, const int* n, float d) {
                     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -286,7 +284,7 @@ public class Test {
         }
     }
 
-    private static void testPerformanceComparison() throws NativeException, Exception {
+    private static void testPerformanceComparison() throws Exception {
 
         int         max      = 100_000;
         List<Float> javaList = new ArrayList<>();
