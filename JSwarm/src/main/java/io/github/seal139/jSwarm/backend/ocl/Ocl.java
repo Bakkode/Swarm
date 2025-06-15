@@ -76,7 +76,7 @@ public final class Ocl implements Platform {
     public String getName() { return this.platform; }
 
     @Override
-    public String getFullName() { return "Nvidia CUDA"; }
+    public String getFullName() { return "Open Computing Language"; }
 
     @Override
     public boolean isPrimary() { return true; }

@@ -1,6 +1,3 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
@@ -13,6 +10,8 @@ import io.github.seal139.jSwarm.backend.Kernel;
 import io.github.seal139.jSwarm.backend.Module;
 import io.github.seal139.jSwarm.backend.Platform;
 import io.github.seal139.jSwarm.backend.cuda.Cuda;
+import io.github.seal139.jSwarm.backend.jvm.Jvm;
+import io.github.seal139.jSwarm.backend.ocl.Ocl;
 import io.github.seal139.jSwarm.datatype.FloatVector;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.runtime.NdRange;
@@ -20,18 +19,15 @@ import io.github.seal139.jSwarm.runtime.SyncDirection;
 
 public class Test {
 
-    @SuppressWarnings("unchecked")
-    public static void cudaTest() throws Error, Exception {
-        Platform platform = Cuda.getInstance();
-
-        System.out.println(platform.getName() + " v" + platform.getVersion() + "\n");
+    private static void hardwareEnumerator(Platform platform) {
+        System.out.println("----------" + platform.getName() + " - " + platform.getFullName() + " v" + platform.getVersion() + "--------- \n");
         for (Executor dev : platform.getDevices()) {
 
             System.out.println(dev.getUuid() + ": " + dev.getName());
             System.out.println(dev.getFlops() + " GFLOPS");
             System.out.println("Compute Unit: " + String.valueOf(dev.getComputeUnit()));
             System.out.println("Total Memory: " + String.valueOf(dev.getTotalMemory() / 1049000000) + "Gb");
-            System.out.println("NDRange: 3");
+            System.out.println("NDRange: " + dev.getMaxNDRange());
             System.out.println("Max Global NDRange [" //
                     + String.valueOf(dev.getMaxGlobalSize()[0]) + ", " //
                     + String.valueOf(dev.getMaxGlobalSize()[1]) + ", " //
@@ -44,26 +40,28 @@ public class Test {
 
             System.out.println("Max Local Thread: " + String.valueOf(dev.getMaxLocalThread()));
 
-            System.out.println("\n");
+            System.out.println("");
         }
 
+        System.out.println("");
+    }
+
+    private static void runKernel(Platform platform) {
         Executor device = platform.getDevices()[0];
 
         try {
-            Context ctx = device.getDefaultContext(); // ((CudaDevice) device).newContext();
-//            Context cetax = device.getDefaultContext();        //
-
+            Context ctx = device.getDefaultContext();
             ctx.activate();
-
-//            Module module = ctx.loadProgram(cudaKernel); //
             Module module = ctx.loadProgram(ExampleKernel.class); //
 
             //
-            Vector<Float> i1 = new FloatVector(5, true); //
-            Vector<Float> i2 = new FloatVector(5, true); //
-            Vector<Float> o1 = new FloatVector(5, true); //
+            Vector<Float> i1 = new FloatVector(6, true); //
+            Vector<Float> i2 = new FloatVector(6, true); //
 
-            for (long i = 0; i < 5; i++) {
+            Vector<Float> o1 = new FloatVector(36, true); //
+            Vector<Float> o2 = new FloatVector(36, true); //
+
+            for (long i = 0; i < 6; i++) {
                 i1.set(i, (1 + i) * 1.0f);
                 i2.set(i, (6 + i) * 1.0f);
             }
@@ -71,6 +69,7 @@ public class Test {
             ctx.hook(i1);
             ctx.hook(i2);
             ctx.hook(o1);
+            ctx.hook(o2);
 
             //
 
@@ -78,46 +77,26 @@ public class Test {
             ctx.waitOperation();
 
             Kernel addKernel = module.getKernel("vecAdd");
-            ctx.launch(addKernel, NdRange.OneDimensional(1, 5), i1, i2, o1, 5, 2.64f);
+            ctx.launch(addKernel, NdRange.TwoDimensional(2, 2, 3, 3), i1, i2, o1, o2, 1.5f);
             ctx.waitOperation();
 
-            ctx.sync(SyncDirection.TO_HOST, o1);
+            ctx.sync(SyncDirection.TO_HOST, o1, o2);
             ctx.waitOperation();
 
             ctx.unhook(i1);
             ctx.unhook(i2);
             ctx.unhook(o1);
+            ctx.unhook(o2);
 
             o1.forEach(v -> System.out.println(v));
-            System.out.println("End");
+
+            i1.close();
+            i2.close();
+            o1.close();
+            o2.close();
+
         }
         catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void boo() {
-
-        String classPath = "/" + Test.Expl.class.getName().replace('.', '/') + ".class";
-
-        try {
-            // Run javap command to disassemble bytecode of the class
-            ProcessBuilder pb = new ProcessBuilder("javap", "-c", Test.Expl.class.getName());
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // Read and print the output
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println(line);
-                }
-            }
-
-            // Wait for the command to finish
-            process.waitFor();
-        }
-        catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
@@ -312,7 +291,16 @@ public class Test {
     }
 
     public static void main(String... strings) throws Exception {
-        cudaTest();
+        hardwareEnumerator(Cuda.getInstance());
+        hardwareEnumerator(Ocl.getInstance());
+        hardwareEnumerator(Jvm.getInstance());
+
+        runKernel(Jvm.getInstance());
+        System.out.println("---");
+        runKernel(Cuda.getInstance());
+        System.out.println("---");
+        runKernel(Ocl.getInstance());
+        System.out.println("---");
 
         testPerformanceComparison();
 

@@ -8,7 +8,7 @@ import io.github.seal139.jSwarm.runtime.DeviceType;
 import sun.misc.Unsafe;
 
 public class OclDevice implements Executor {
-    private final DeviceType type = DeviceType.GPU_ACCELERATOR;
+    private final DeviceType type = DeviceType.CUSTOM;
 
     private final long deviceId;
     private OclContext context;
