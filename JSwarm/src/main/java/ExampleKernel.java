@@ -12,10 +12,25 @@ public final class ExampleKernel extends Program {
                 currentY, globalZ, localZ, totalZ, currentGlobalZ, currentLocalZ, currentZ);
     }
 
-    public void vecAdd(FloatVector a, FloatVector b, FloatVector c, int n, float d) {
+    public void vecAdd(FloatVector a, FloatVector b, FloatVector c, FloatVector d, float e) {
         int idx = this.currentRangeX;
-        if (idx < n) {
-            set(c, idx, (d + get(a, idx) + get(b, idx)));
+        int idy = this.currentRangeY;
+
+        int scIndex = (this.currentRangeX * 6) + idy;
+
+        float t = get(a, idx) * get(b, idy);
+
+        set(c, scIndex, t);
+
+        synchronize();
+
+        float summ = 0;
+
+        int max = this.totalRangeX * this.totalRangeY;
+        for (long i = 0; i < max; i++) {
+            summ += get(c, i);
         }
+
+        set(d, scIndex, e * summ);
     }
 }

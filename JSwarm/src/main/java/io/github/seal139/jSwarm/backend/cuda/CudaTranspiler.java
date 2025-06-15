@@ -3,6 +3,8 @@ package io.github.seal139.jSwarm.backend.cuda;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.github.seal139.jSwarm.backend.Transpiler;
+import io.github.seal139.jSwarm.runtime.TranspileException;
 import io.github.seal139.jSwarm.transpiler.JParser.AdditiveExpressionContext;
 import io.github.seal139.jSwarm.transpiler.JParser.AndExpressionContext;
 import io.github.seal139.jSwarm.transpiler.JParser.ArrayAccessContext;
@@ -50,8 +52,6 @@ import io.github.seal139.jSwarm.transpiler.JParser.UnaryExpressionNotPlusMinusCo
 import io.github.seal139.jSwarm.transpiler.JParser.VariableDeclaratorContext;
 import io.github.seal139.jSwarm.transpiler.JParser.WhileStatementContext;
 import io.github.seal139.jSwarm.transpiler.JParser.WhileStatementNoShortIfContext;
-import io.github.seal139.jSwarm.backend.Transpiler;
-import io.github.seal139.jSwarm.runtime.TranspileException;
 import io.github.seal139.jSwarm.transpiler.JParserBaseListener;
 
 public final class CudaTranspiler extends JParserBaseListener implements Transpiler {
@@ -524,6 +524,13 @@ public final class CudaTranspiler extends JParserBaseListener implements Transpi
         }
 
         int getset = 0;
+
+        if ((ctx.primary() != null //
+        ) && (ctx.primary().primaryNoNewArray().expressionName() == null //
+        ) && (ctx.primary().primaryNoNewArray().expression() != null)) {
+            visitExpression(ctx.primary().primaryNoNewArray().expression());
+            return;
+        }
 
         if (ctx.identifier() != null) {
             if ("get".equals(ctx.identifier().getText())) {
