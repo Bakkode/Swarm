@@ -255,9 +255,12 @@ public final class OclTranspiler extends JParserBaseListener implements Transpil
             if (ctx.methodModifier().stream().anyMatch(v -> "public".equals(v.getText()))) {
                 this.sb.append("\n").append("__kernel");
             }
+            else {
+                this.sb.append("\n").append("inline");
+            }
 
             // Header
-            this.sb.append("\n");
+            this.sb.append(" ");
 
             // Return Type
             String rawRet = ctx.methodHeader().result().getText();
@@ -683,7 +686,7 @@ public final class OclTranspiler extends JParserBaseListener implements Transpil
             this.sb.append("return ");
 
             if (ctx.returnStatement().expression() != null) {
-                this.sb.append(ctx.returnStatement().expression().getText());
+                visitExpression(ctx.returnStatement().expression());
             }
             this.sb.append(";\n");
         }

@@ -64,9 +64,8 @@ public class JvmKernel implements Kernel {
                       Number... param) {
 
         exec.execute(() -> {
-            Program obj;
             try {
-                obj = (Program) this.constr.newInstance(barrier, //
+                Program obj = (Program) this.constr.newInstance(barrier, //
                         globalX, localX, totalX, currentGlobalX, currentLocalX, currentX, //
                         globalY, localY, totalY, currentGlobalY, currentLocalY, currentY, //
                         globalZ, localZ, totalZ, currentGlobalZ, currentLocalZ, currentZ);
@@ -75,7 +74,6 @@ public class JvmKernel implements Kernel {
 
             }
             catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         });

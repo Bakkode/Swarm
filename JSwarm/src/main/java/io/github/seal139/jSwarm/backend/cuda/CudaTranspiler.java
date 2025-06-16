@@ -256,11 +256,11 @@ public final class CudaTranspiler extends JParserBaseListener implements Transpi
                 this.sb.append("\n").append("__global__");
             }
             else {
-                this.sb.append("\n").append("__device__ ");
+                this.sb.append("\n").append("__device__ inline");
             }
 
             // Header
-            this.sb.append("\n");
+            this.sb.append(" ");
 
             // Return Type
             String rawRet = ctx.methodHeader().result().getText();
@@ -686,7 +686,7 @@ public final class CudaTranspiler extends JParserBaseListener implements Transpi
             this.sb.append("return ");
 
             if (ctx.returnStatement().expression() != null) {
-                this.sb.append(ctx.returnStatement().expression().getText());
+                visitExpression(ctx.returnStatement().expression());
             }
             this.sb.append(";\n");
         }
