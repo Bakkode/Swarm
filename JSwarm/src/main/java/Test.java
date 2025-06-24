@@ -1,9 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 
+import io.github.seal139.jSwarm.backend.BackendException;
 import io.github.seal139.jSwarm.backend.Context;
 import io.github.seal139.jSwarm.backend.Executor;
 import io.github.seal139.jSwarm.backend.Kernel;
@@ -13,7 +11,11 @@ import io.github.seal139.jSwarm.backend.cuda.Cuda;
 import io.github.seal139.jSwarm.backend.jvm.Jvm;
 import io.github.seal139.jSwarm.backend.ocl.Ocl;
 import io.github.seal139.jSwarm.datatype.FloatVector;
+import io.github.seal139.jSwarm.datatype.IntVector;
 import io.github.seal139.jSwarm.datatype.Vector;
+import io.github.seal139.jSwarm.example.ExampleKernel;
+import io.github.seal139.jSwarm.misc.Common;
+import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.runtime.NdRange;
 import io.github.seal139.jSwarm.runtime.SyncDirection;
 
@@ -47,6 +49,8 @@ public class Test {
     }
 
     private static void runKernel(Platform platform) {
+        System.out.println("----------" + platform.getName() + " - " + platform.getFullName() + " v" + platform.getVersion() + "--------- \n");
+
         Executor device = platform.getDevices()[0];
 
         try {
@@ -77,7 +81,7 @@ public class Test {
             ctx.waitOperation();
 
             Kernel addKernel = module.getKernel("vecAdd");
-            ctx.launch(addKernel, NdRange.TwoDimensional(2, 2, 3, 3), i1, i2, o1, o2, 1.5f);
+            ctx.launch(addKernel, NdRange.twoDimensional(2, 2, 3, 3), i1, i2, o1, o2, 1.5f);
             ctx.waitOperation();
 
             ctx.sync(SyncDirection.TO_HOST, o1, o2);
@@ -88,7 +92,9 @@ public class Test {
             ctx.unhook(o1);
             ctx.unhook(o2);
 
-            o1.forEach(v -> System.out.println(v));
+            for (int i = 0; i < 36; i++) {
+                System.out.println(o1.get(i) + " :: " + o2.get(i));
+            }
 
             i1.close();
             i2.close();
@@ -98,6 +104,137 @@ public class Test {
         }
         catch (Exception e) {
             e.printStackTrace();
+        }
+
+        System.out.println("");
+    }
+
+    private static void testList() throws Exception {
+
+        System.out.println("Total memory: " + (Runtime.getRuntime().maxMemory() / 1024 / 1024) + "MB \n");
+
+        int m = Integer.MAX_VALUE / 8;
+
+        for (int rr = 0; rr < 5; rr++) {
+            System.out.println("\n\n\n");
+            System.out.println("Iter: " + rr + 1);
+
+            for (int max = m; max > 63; max /= 2) {
+                {
+                    long          begin = System.nanoTime();
+                    List<Integer> ff    = new ArrayList<>();
+                    for (int i = 0; i < max; i++) {
+                        ff.add(i);
+                    }
+                    long end = System.nanoTime() - begin;
+
+                    System.out.println("List<Integer> - Uninitialized Write " + max + " data = " + end);
+
+                    Integer f;
+                    begin = System.nanoTime();
+                    for (int i = 0; i < max; i++) {
+                        f = ff.get(i);
+                    }
+                    end = System.nanoTime() - begin;
+                    System.out.println("List<Integer> - Uninitialized Read " + max + " data = " + end);
+                }
+
+                {
+                    long          begin = System.nanoTime();
+                    List<Integer> ff    = new ArrayList<>(max);
+                    for (int i = 0; i < max; i++) {
+                        ff.add(i);
+                    }
+                    long end = System.nanoTime() - begin;
+
+                    System.out.println("List<Integer> - Initialized Write " + max + " data = " + end);
+
+                    Integer f;
+                    begin = System.nanoTime();
+                    for (int i = 0; i < max; i++) {
+                        f = ff.get(i);
+                    }
+                    end = System.nanoTime() - begin;
+                    System.out.println("List<Integer> - Initialized Read " + max + " data = " + end);
+                }
+            }
+        }
+    }
+
+    private static void testVector() throws Exception {
+
+        System.out.println("Total memory: " + (Runtime.getRuntime().maxMemory() / 1024 / 1024) + "MB \n");
+
+        int m = Integer.MAX_VALUE / 8;
+
+        for (int rr = 0; rr < 5; rr++) {
+            System.out.println("\n\n\n");
+            System.out.println("Iter: " + rr + 1);
+
+            for (int max = m; max > 63; max /= 2) {
+                {
+                    long            begin = System.nanoTime();
+                    Vector<Integer> ff    = new IntVector();
+                    for (int i = 0; i < max; i++) {
+                        ff.add(i);
+                    }
+                    long end = System.nanoTime() - begin;
+
+                    System.out.println("Vector<Integer> - Uninitialized Write " + max + " data = " + end);
+
+                    Integer f;
+                    begin = System.nanoTime();
+                    for (int i = 0; i < max; i++) {
+                        f = ff.get(i);
+                    }
+                    end = System.nanoTime() - begin;
+                    System.out.println("Vector<Integer> - Uninitialized Read " + max + " data = " + end);
+
+                    ff.close();
+                }
+
+                {
+                    long            begin = System.nanoTime();
+                    Vector<Integer> ff    = new IntVector(max, false);
+                    for (int i = 0; i < max; i++) {
+                        ff.add(i);
+                    }
+                    long end = System.nanoTime() - begin;
+
+                    System.out.println("Vector<Integer> - Initialized Write " + max + " data = " + end);
+
+                    Integer f;
+                    begin = System.nanoTime();
+                    for (int i = 0; i < max; i++) {
+                        f = ff.get(i);
+                    }
+                    end = System.nanoTime() - begin;
+                    System.out.println("Vector<Integer> - Initialized Read " + max + " data = " + end);
+
+                    ff.close();
+                }
+
+                {
+                    long            begin = System.nanoTime();
+                    Vector<Integer> ff    = new IntVector(max, true);
+                    for (int i = 0; i < max; i++) {
+                        ff.set(i, i);
+                    }
+                    long end = System.nanoTime() - begin;
+
+                    System.out.println("Vector<Integer> - Aligned Write " + max + " data = " + end);
+
+                    Integer f;
+                    begin = System.nanoTime();
+                    for (int i = 0; i < max; i++) {
+                        f = ff.get(i);
+                    }
+                    end = System.nanoTime() - begin;
+                    System.out.println("Vector<Integer> - Aligned Read " + max + " data = " + end);
+
+                    ff.close();
+                }
+            }
         }
     }
 
@@ -117,7 +254,7 @@ public class Test {
             int i = 0;
             for (Float f : ff) {
                 if (!fv.get(i).equals(f)) {
-                    System.out.println("nah ngaco: " + i);
+                    System.out.println("Data Salah: " + i);
                     System.out.println(f);
                     System.out.println(fv.get(i));
                 }
@@ -151,7 +288,7 @@ public class Test {
             int j = 0;
             for (Float f : ff) {
                 if (!fv.get(j).equals(f)) {
-                    System.out.println("nah ngaco");
+                    System.out.println("Data Salah");
                 }
                 j += 1;
             }
@@ -201,7 +338,6 @@ public class Test {
             nf  += 1;
             System.out.println("-Native list iteration took " + (ctr / 1000000.0) + "ms");
         }
-
     }
 
     private static void benchFloatArray() throws Exception {
@@ -224,7 +360,7 @@ public class Test {
 
                     ctr = System.nanoTime() - ctr;
 
-                    System.out.println("-Insertion of " + fv.size() + " data: " + (ctr /* / 1000000.0 */) + "ns");
+                    System.out.println("-Insertion of " + fv.size() + " data: " + (ctr /* / 1000000.0 */));
 
                     Float f;
                     int   c = 0;
@@ -235,7 +371,7 @@ public class Test {
                     }
                     ctr = System.nanoTime() - ctr;
 
-                    System.out.println("-iteration of " + c + " data: " + (ctr) + "ns");
+                    System.out.println("-iteration of " + c + " data: " + (ctr));
                 }
             }
         }
@@ -261,14 +397,14 @@ public class Test {
                         fv.set(i, 10f);
                     }
                     ctr = System.nanoTime() - ctr;
-                    System.out.println("- Rand  Write of " + j + " data: " + (ctr) + "ns");
+                    System.out.println("- Rand  Write of " + j + " data: " + (ctr));
 
                     ctr = System.nanoTime();
                     for (int i = 0; i < max; i++) {
                         fv.add(ff);
                     }
                     ctr = System.nanoTime() - ctr;
-                    System.out.println("- Seq  Insert of " + fv.size() + " data: " + (ctr /* / 1000000.0 */) + "ns");
+                    System.out.println("- Seq  Insert of " + fv.size() + " data: " + (ctr /* / 1000000.0 */));
 
                     int c = 0;
                     ctr = System.nanoTime();
@@ -276,68 +412,219 @@ public class Test {
                         c += 1;
                     }
                     ctr = System.nanoTime() - ctr;
-                    System.out.println("- Seq Iterate of " + c + " data: " + (ctr) + "ns");
+                    System.out.println("- Seq Iterate of " + c + " data: " + (ctr));
 
                     ctr = System.nanoTime();
                     for (int i = 0; i < j; i++) {
                         fv.get(i);
                     }
                     ctr = System.nanoTime() - ctr;
-                    System.out.println("-Rand iterate of " + c + " data: " + (ctr) + "ns");
+                    System.out.println("-Rand iterate of " + c + " data: " + (ctr));
                 }
             }
+        }
+    }
+
+    private static void testMatrixDotProduct(Platform platform, FloatVector i1, FloatVector i2, FloatVector o)
+            throws BackendException, DeallocatedException {
+        long cnt = (32 * 32) * 1;
+
+        Executor device = platform.getDevices()[0];
+        Context  ctx    = device.getDefaultContext();
+        ctx.activate();
+
+        Module module = ctx.loadProgram(ExampleKernel.class); //
+        ctx.hook(i1);
+        ctx.hook(i2);
+        ctx.hook(o);
+
+        ctx.sync(SyncDirection.TO_DEVICE, i1, i2);
+
+        Kernel addKernel = module.getKernel("matrixMultiplication");
+
+        System.out.println("-");
+//        for (int i = 131072; i <= 33554432; i *= 2) { //50331648
+        for (int i = 524288; i <= 524288; i += 524288) {
+            System.out.print("Elapsed time " + i + " iter: ");
+            for (int k = 0; k < 5; k++) {
+                long ctr = System.nanoTime();
+                ctx.launch(addKernel, NdRange.twoDimensional(i, 1, 32, 32), i1, i2, o);
+                ctx.waitOperation();
+                ctr = System.nanoTime() - ctr;
+
+                System.out.print(": " + (ctr / 1000000f));
+            }
+
+            System.out.println();
+        }
+
+        ctx.sync(SyncDirection.TO_HOST, o);
+        ctx.waitOperation();
+
+        ctx.unhook(i1);
+        ctx.unhook(i2);
+        ctx.unhook(o);
+
+        for (int i = 0; i < cnt; i++) {
+            System.out.print(o.get(i) + ", ");
         }
 
     }
 
+    private static int getScalarIndex(int dim, int x, int y) {
+        return((x * dim) + y);
+    }
+
+    private static void jvmLoop(float x1[], float x2[], float o[], int dim) throws Exception {
+        for (int x = 0; x < dim; x++) {
+            for (int y = 0; y < dim; y++) {
+
+                float tmp = 0.0f;
+                for (int i = 0; i < dim; i++) {
+                    float xi = x1[getScalarIndex(dim, i, y)];
+                    float yi = x2[getScalarIndex(dim, x, i)];
+
+                    tmp += (xi * yi);
+
+                }
+
+                o[getScalarIndex(dim, x, y)] = tmp;
+            }
+        }
+    }
+
     public static void main(String... strings) throws Exception {
-        hardwareEnumerator(Cuda.getInstance());
         hardwareEnumerator(Ocl.getInstance());
-        hardwareEnumerator(Jvm.getInstance());
+        hardwareEnumerator(Cuda.getInstance());
 
-        runKernel(Jvm.getInstance());
-        System.out.println("---");
-        runKernel(Cuda.getInstance());
-        System.out.println("---");
-        runKernel(Ocl.getInstance());
-        System.out.println("---");
+        // testVectorSync();
 
-        testPerformanceComparison();
+        {
 
-        System.out.println("===");
+            int split = 65536;
 
-        int count = 20;
+            int mm = 32 * 32;
 
-        final CyclicBarrier cb  = new CyclicBarrier(count);
-        ForkJoinPool        fjp = new ForkJoinPool(20);
+            float x1[] = new float[mm];
+            float x2[] = new float[mm];
+            float o[]  = new float[mm];
+            for (int i = 0; i < mm; i++) {
+                x1[i] = (i + 1) * 0.5f;
+                x2[i] = (i + 1) * 1.5f;
+            }
 
-        int value[] = {
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            // 50331648
+            // for (int i = 524288; i <= 524288; i += 524288) {
 
-        int a[] = {
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+            for (int ii = 524288; ii <= 50331648; ii += 524288) {
+                System.out.print("\nElapsed time " + ii + " iter: ");
 
-        int b[] = {
-                2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 7, 7, 7, 7, 7 };
+                for (int k = 0; k < 5; k++) {
+                    int _ii = (ii / split) / 8;
 
-        for (int i = 0; i < count; i++) {
-            final int c = i;
+                    long ctr = System.nanoTime();
+                    Common.queue(() -> {
+                        for (int l = 0; l < _ii; l++) {
+                            for (int i = 0; i < split; i++) {
+                                jvmLoop(x1, x2, o, 32);
+                            }
+                        }
 
-            fjp.submit(() -> {
+                        return null;
+                    });
+                    Common.await("JVM simulation", Integer.MAX_VALUE);
 
-                ExampleKernel x = new ExampleKernel(cb, count, count, count, count, count, count, count, count, count, count, count, count, count,
-                        count, count, count, count, count);
-
-                try {
-                    // x.execute(c, value, a, b);
+                    ctr = System.nanoTime() - ctr;
+                    System.out.print(": " + (ctr / 1000000f));
                 }
-                catch (Exception e) {
-                    // TODO: handle exception
-                }
-            });
+
+            }
+
+            System.out.println("");
+            for (float oo : o) {
+                // System.out.print(oo + ", ");
+            }
         }
 
-        fjp.awaitQuiescence(30, TimeUnit.SECONDS);
+        System.out.println("\n\n\n\n");
+        // testList();
+        // testVector();
+
+        {
+            long        cnt = (32 * 32) * 1;
+            FloatVector i1  = new FloatVector(cnt, true);
+            FloatVector i2  = new FloatVector(cnt, true);
+            FloatVector o   = new FloatVector(cnt, true);
+
+            for (long i = 0; i < cnt; i++) {
+                i1.set(i, (i + 1) * 0.5f);
+                i2.set(i, (i + 1) * 1.5f);
+            }
+
+            System.out.println("Multiplication 32x32 matrix ");
+            System.out.print("JVM   : ");
+            testMatrixDotProduct(Jvm.getInstance(), i1, i2, o);
+            System.out.print("\nvs\nCUDA  : ");
+            testMatrixDotProduct(Cuda.getInstance(), i1, i2, o);
+            System.out.print("\nvs\nOpenCL: ");
+            testMatrixDotProduct(Ocl.getInstance(), i1, i2, o);
+
+            i1.close();
+            i2.close();
+            o.close();
+        }
+
+        System.out.println();
+        System.out.println();
+        System.out.println();
+
+//        hardwareEnumerator(Cuda.getInstance());
+//        hardwareEnumerator(Ocl.getInstance());
+//        hardwareEnumerator(Jvm.getInstance());
+//
+//        runKernel(Jvm.getInstance());
+//        runKernel(Cuda.getInstance());
+//        runKernel(Ocl.getInstance());
+
+//        testDynamicVector();
+//
+//        System.out.println("\n\n");
+//        testPerformanceComparison();
+//
+//        System.out.println("===");
+//
+//        int count = 20;
+//
+//        final CyclicBarrier cb  = new CyclicBarrier(count);
+//        ForkJoinPool        fjp = new ForkJoinPool(20);
+//
+//        int value[] = {
+//                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+//
+//        int a[] = {
+//                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+//
+//        int b[] = {
+//                2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 7, 7, 7, 7, 7 };
+//
+//        for (int i = 0; i < count; i++) {
+//            final int c = i;
+//
+//            fjp.submit(() -> {
+//
+//                ExampleKernel x = new ExampleKernel(cb, count, count, count, count, count, count, count, count, count, count, count, count, count,
+//                        count, count, count, count, count);
+//
+//                try {
+//                    // x.execute(c, value, a, b);
+//                }
+//                catch (Exception e) {
+//                    // TODO: handle exception
+//                }
+//            });
+//        }
+
+        // fjp.awaitQuiescence(30, TimeUnit.SECONDS);
 
 //        cudaTest();
 //

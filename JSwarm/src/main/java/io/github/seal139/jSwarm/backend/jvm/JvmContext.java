@@ -2,6 +2,7 @@ package io.github.seal139.jSwarm.backend.jvm;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 import io.github.seal139.jSwarm.backend.BackendException;
 import io.github.seal139.jSwarm.backend.Context;
@@ -57,18 +58,22 @@ public class JvmContext implements Context {
     @Override
     public void launch(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         JvmKernel jKernel = (JvmKernel) kernel;
-        jKernel.run(ndRange, arguments);
-        jKernel.await();
+
+        try {
+            jKernel.run(ndRange, arguments).await();
+        }
+        catch (InterruptedException e) {
+            throw new JvmException(e);
+        }
     }
 
-    private Set<JvmKernel> processingKernel = new HashSet<>();
+    private Set<CountDownLatch> processingKernel = new HashSet<>();
 
     @Override
     public void launchAsync(Kernel kernel, NdRange ndRange, Number... arguments) throws BackendException, DeallocatedException {
         JvmKernel jKernel = (JvmKernel) kernel;
-        jKernel.run(ndRange, arguments);
 
-        this.processingKernel.add(jKernel);
+        this.processingKernel.add(jKernel.run(ndRange, arguments));
     }
 
     @Override
@@ -77,6 +82,7 @@ public class JvmContext implements Context {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void sync(SyncDirection direction, Vector<? extends Number>... dataCollection) throws BackendException, DeallocatedException {
         // NoOp
     }
@@ -93,7 +99,14 @@ public class JvmContext implements Context {
 
     @Override
     public void waitOperation() throws BackendException, DeallocatedException {
-        this.processingKernel.forEach(JvmKernel::await);
+        this.processingKernel.forEach(v -> {
+            try {
+                v.await();
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
         this.processingKernel.clear();
     }
 

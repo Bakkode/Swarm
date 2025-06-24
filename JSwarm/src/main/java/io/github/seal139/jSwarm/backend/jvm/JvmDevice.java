@@ -49,11 +49,11 @@ public class JvmDevice implements Executor {
     @Override
     public long[] getMaxLocalSize() { // TODO Auto-generated method stub
         return new long[] {
-                Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE };
+                1024, 32, 32 };
     }
 
     @Override
-    public long getMaxLocalThread() { return Integer.MAX_VALUE; }
+    public long getMaxLocalThread() { return 1024; }
 
     @Override
     public long getFlops() { return 0; }

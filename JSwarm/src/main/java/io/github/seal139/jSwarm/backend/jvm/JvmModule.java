@@ -23,7 +23,7 @@ public class JvmModule implements Module {
         Constructor<?> constructor = null;
 
         for (Constructor<?> constr : constrs) {
-            if (constr.getParameterCount() == 19) {
+            if (constr.getParameterCount() == 0) {
                 constructor = constr;
                 break;
             }
