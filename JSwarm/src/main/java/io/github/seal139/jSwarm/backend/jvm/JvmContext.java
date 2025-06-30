@@ -72,7 +72,7 @@ public class JvmContext implements Context {
         // NoOp
     }
 
-    private void validateLaunch(NdRange ndRange) throws BackendException {
+    private void validateLaunch(NdRange ndRange, Number... arguments) throws BackendException {
         long[] maxLocalThread = this.device.getMaxLocalSize();
 
         if ((ndRange.getXLocal() > maxLocalThread[0]) //
@@ -82,6 +82,14 @@ public class JvmContext implements Context {
             || ((ndRange.getXLocal() * ndRange.getYLocal() * ndRange.getZLocal()) > this.device.getMaxLocalThread()) //
         ) {
             throw new JvmException("Local thread exceed maximum range");
+        }
+
+        for (Number num : arguments) {
+            if (num instanceof Vector vector) {
+                if (!this.hookedVector.contains(vector)) {
+                    throw new JvmException("Vector is not hooked");
+                }
+            }
         }
     }
 

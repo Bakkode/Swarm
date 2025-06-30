@@ -26,7 +26,7 @@ public final class ExampleKernel extends Program {
         set(result, getScalarIndex(x, y), temp);
     }
 
-    public void fmaAccumulator(FloatVector v1, FloatVector v2, FloatVector output) {
+    public void fmaAccumulator(FloatVector v1, FloatVector v2, FloatVector output, int count) {
 
         float mul = 0;
 
@@ -47,7 +47,7 @@ public final class ExampleKernel extends Program {
         float accumulation = 0;
         if (currentLocalRangeX() == 0) {
 
-            int start = (1024 * currentGlobalRangeX());
+            int start = (count * currentGlobalRangeX());
             int end   = start + 1024;
 
             for (int i = start; i < end; i++) {

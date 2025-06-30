@@ -2,6 +2,8 @@ package io.github.seal139.jSwarm.wrapper;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 import io.github.seal139.jSwarm.backend.BackendException;
 import io.github.seal139.jSwarm.backend.Context;
@@ -96,7 +98,9 @@ public class ParallelTask {
             this.module = this.ctx.loadProgram(clazz);
         }
 
-        private Vector<? extends Number>[] vars = null;
+        private Number[] vars = null;
+
+        private final Set<Vector<? extends Number>> vecs = new HashSet<>();
 
         /**
          * Set data arguments before executing kernel
@@ -107,20 +111,35 @@ public class ParallelTask {
          * @throws DeallocatedException
          */
         @SuppressWarnings("unchecked")
-        public GeneralContext withArguments(Vector<? extends Number>... vars) throws BackendException, DeallocatedException {
+        public GeneralContext withArguments(Number... vars) throws BackendException, DeallocatedException {
             if (this.vars != null) {
-                for (Vector<? extends Number> var : this.vars) {
-                    this.ctx.unhook(var);
+                for (Number var : this.vars) {
+
+                    if (var instanceof Vector vector) {
+                        this.ctx.unhook(vector);
+                    }
                 }
             }
 
             this.vars = vars;
 
-            for (Vector<? extends Number> var : vars) {
-                this.ctx.hook(var);
+            for (Number var : vars) {
+                if (var instanceof Vector vector) {
+                    this.ctx.hook(vector);
+                }
             }
 
-            this.ctx.sync(SyncDirection.TO_DEVICE, this.vars);
+            {
+                final Vector<? extends Number>[] vec = new Vector[this.vecs.size()];
+
+                int index = -1;
+                for (Vector<? extends Number> vector : this.vecs) {
+                    vec[++index] = vector;
+                }
+
+                this.ctx.sync(SyncDirection.TO_DEVICE, vec);
+            }
+
             this.ctx.waitOperation();
 
             return this;
@@ -135,7 +154,17 @@ public class ParallelTask {
          * @throws DeallocatedException
          */
         public GeneralContext fetchData() throws BackendException, DeallocatedException {
-            this.ctx.sync(SyncDirection.TO_HOST, this.vars);
+            {
+                final Vector<? extends Number>[] vec = new Vector[this.vecs.size()];
+
+                int index = -1;
+                for (Vector<? extends Number> vector : this.vecs) {
+                    vec[++index] = vector;
+                }
+
+                this.ctx.sync(SyncDirection.TO_HOST, vec);
+            }
+
             this.ctx.waitOperation();
 
             return this;
@@ -170,8 +199,11 @@ public class ParallelTask {
         public void close() throws IOException {
             try {
                 if (this.vars != null) {
-                    for (Vector<? extends Number> var : this.vars) {
-                        this.ctx.unhook(var);
+                    for (Number var : this.vars) {
+
+                        if (var instanceof Vector vector) {
+                            this.ctx.unhook(vector);
+                        }
                     }
                 }
 

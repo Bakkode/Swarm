@@ -514,7 +514,7 @@ public class Test {
                 Jvm.getInstance(), Cuda.getInstance(), Ocl.getInstance() }) {
 
             loader.atPlatform(p)//
-                    .withArguments(inputA, inputB, output) //
+                    .withArguments(inputA, inputB, output, 1024) //
                     .execute("fmaAccumulator", NdRange.oneDimensional(20, 1024)) //
                     .fetchData() //
                     .close(); //
