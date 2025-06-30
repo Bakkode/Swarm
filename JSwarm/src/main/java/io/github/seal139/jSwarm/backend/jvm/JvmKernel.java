@@ -8,6 +8,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
@@ -25,17 +26,20 @@ public class JvmKernel implements Kernel {
 
     private final MethodHandle spreadInvoker;
 
-    private final String name;
+    private final String  name;
+    private final boolean synced;
 
-    final int             batch = Runtime.getRuntime().availableProcessors();
-    final ExecutorService exec  = Executors.newFixedThreadPool(this.batch);
+    final int batch = Runtime.getRuntime().availableProcessors();
+
+    ExecutorService exec = null;
 
     final MethodType invokedType   = MethodType.methodType(Supplier.class);
     final MethodType samMethodType = MethodType.methodType(Object.class);
 
-    JvmKernel(Constructor<?> ctor, Method method) {
+    JvmKernel(Constructor<?> ctor, Method method, boolean sync) throws JvmException {
 
-        this.name = method.getName();
+        this.name   = method.getName();
+        this.synced = sync;
 
         MethodHandle hwnd = null;
 
@@ -44,8 +48,11 @@ public class JvmKernel implements Kernel {
         try {
             final MethodHandles.Lookup lookup = MethodHandles.lookup();
 
+            ctor.setAccessible(true);
             final MethodHandle cnstor = lookup.unreflectConstructor(ctor);
-            final MethodHandle mh     = lookup.unreflect(method);
+
+            method.setAccessible(true);
+            final MethodHandle mh = lookup.unreflect(method);
 
             hwnd = mh.asSpreader(Number[].class, method.getParameterCount()); //
 
@@ -60,14 +67,14 @@ public class JvmKernel implements Kernel {
             ivkr = (Supplier<Program>) site.getTarget().invokeExact();
         }
         catch (Throwable e) {
-            e.printStackTrace();
+            throw new JvmException(e);
         }
 
         this.ctor          = ivkr;
         this.spreadInvoker = hwnd;
     }
 
-    CountDownLatch run(NdRange range, Number... param) throws BackendException {
+    Runnable run(NdRange range, Number... param) throws BackendException {
 
         // To simulate local thread barrier efficiently, inverse the loop order. Loop
         // through global first, then the local. So we do not need local thread barrier
@@ -80,11 +87,13 @@ public class JvmKernel implements Kernel {
         int sizeZ      = range.getZLocal();
         int totalItems = sizeX * sizeY * sizeZ;
 
-        final int itemsPerBatch = ((totalItems + this.batch) - 1) / this.batch;
+        final int itemsPerBatch = this.synced ? 1 : (((totalItems + this.batch) - 1) / this.batch);
 
-        final CountDownLatch latch = new CountDownLatch(this.batch);
+        final CountDownLatch latch = new CountDownLatch(this.synced ? totalItems : this.batch);
 
-//        final int endIndex = this.batch * itemsPerBatch;
+        final CyclicBarrier synchronizer = new CyclicBarrier(this.synced ? totalItems : 1);
+
+        this.exec = Executors.newFixedThreadPool(this.synced ? totalItems : this.batch);
 
         for (int start = 0; start < /* endIndex */ totalItems; start += itemsPerBatch) {
 
@@ -94,20 +103,32 @@ public class JvmKernel implements Kernel {
                 int end = Math.min(totalItems, _start + itemsPerBatch);
 
                 try {
-                    this.exec.execute(new WorkItemController(latch, this.ctor, this.spreadInvoker, param, range, _start, end));
+                    this.exec.execute(new WorkItemController(latch, synchronizer, this.ctor, this.spreadInvoker, param, range, _start, end));
                 }
-                catch (IllegalArgumentException e) {
-                    throw new JvmException(e);
+                catch (RuntimeException e) {
+                    throw new JvmException(e.getCause());
                 }
                 catch (Throwable e) {
-                    e.printStackTrace();
+                    throw new JvmException(e);
                 }
+
                 return null;
             });
-
         }
 
-        return latch;
+        return (Runnable) () -> {
+
+            try {
+                latch.await();
+            }
+            catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            finally {
+                JvmKernel.this.exec.shutdown();
+            }
+        };
+
     }
 
     @Override

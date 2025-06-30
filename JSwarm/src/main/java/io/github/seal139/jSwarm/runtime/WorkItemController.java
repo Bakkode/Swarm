@@ -2,13 +2,18 @@ package io.github.seal139.jSwarm.runtime;
 
 import java.lang.invoke.MethodHandle;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.function.Supplier;
 
 public class WorkItemController implements Runnable {
 
-    public WorkItemController(CountDownLatch latch, Supplier<Program> obj, MethodHandle method, Object[] param, NdRange range, int start, int end) {
-        this.latch = latch;
-        this.ctor  = obj;
+    public WorkItemController(CountDownLatch latch, CyclicBarrier synchronizer, Supplier<Program> obj, MethodHandle method, Object[] param,
+            NdRange range, int start, int end) {
+
+        this.latch        = latch;
+        this.synchronizer = synchronizer;
+
+        this.ctor = obj;
 
         this.method = method;
 
@@ -25,6 +30,7 @@ public class WorkItemController implements Runnable {
 
     private final Object[]       param;
     private final CountDownLatch latch;
+    private final CyclicBarrier  synchronizer;
 
     private final int start;
     private final int stop;
@@ -57,13 +63,9 @@ public class WorkItemController implements Runnable {
                     lz, gz, cacheRange.getTotalZ() //
             );
 
+            cacheObj.setSynchronizer(this.synchronizer);
+
             int itm;
-
-//            ExampleKernel ek = (ExampleKernel) cacheObj;
-//            FloatVector   i1 = (FloatVector) cacheParam[0];
-//            FloatVector   i2 = (FloatVector) cacheParam[1];
-//            FloatVector   o  = (FloatVector) cacheParam[2];
-
             for (int linearId = cacheStart; linearId < cacheStop; linearId++) {
                 // Convert 1D index back to 3D (Z, Y, X)
                 itm = linearId / lx;
@@ -79,7 +81,6 @@ public class WorkItemController implements Runnable {
                         for (int z = 0, zz = 0; z < gz; zz += lz) {
                             cacheObj.setCurrentGlobalRangeZ(z++, zz);
 
-//                           ek.matrixMultiplication(i1, i2, o);
                             cacheMethod.invoke(cacheParam);
                         }
                     }
@@ -87,7 +88,7 @@ public class WorkItemController implements Runnable {
             }
         }
         catch (Throwable e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
         finally {
             this.latch.countDown();

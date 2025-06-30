@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,10 +15,11 @@ import io.github.seal139.jSwarm.datatype.FloatVector;
 import io.github.seal139.jSwarm.datatype.IntVector;
 import io.github.seal139.jSwarm.datatype.Vector;
 import io.github.seal139.jSwarm.example.ExampleKernel;
-import io.github.seal139.jSwarm.misc.Common;
 import io.github.seal139.jSwarm.misc.NativeCleaner.DeallocatedException;
 import io.github.seal139.jSwarm.runtime.NdRange;
 import io.github.seal139.jSwarm.runtime.SyncDirection;
+import io.github.seal139.jSwarm.wrapper.ParallelTask;
+import io.github.seal139.jSwarm.wrapper.ParallelTask.ProgramLoader;
 
 public class Test {
 
@@ -493,86 +495,122 @@ public class Test {
         }
     }
 
+    private static void runWrapper() throws BackendException, DeallocatedException, IOException {
+
+        int m = 20 * 1024;
+
+        FloatVector inputA = new FloatVector(m, true);
+        FloatVector inputB = new FloatVector(m, true);
+        FloatVector output = new FloatVector(m, true);
+
+        for (int i = 0; i < m; i++) {
+            inputA.set(i, 2 * (i + 1.5f));
+            inputB.set(i, 3 * (i + 1.5f));
+        }
+
+        ProgramLoader loader = ParallelTask.from(ExampleKernel.class);
+
+        for (Platform p : new Platform[] {
+                Jvm.getInstance(), Cuda.getInstance(), Ocl.getInstance() }) {
+
+            loader.atPlatform(p)//
+                    .withArguments(inputA, inputB, output) //
+                    .execute("fmaAccumulator", NdRange.oneDimensional(20, 1024)) //
+                    .fetchData() //
+                    .close(); //
+
+            System.out.println(p.getFullName());
+            for (int i = 0; i < 20; i++) {
+                System.out.println(output.get(i));
+            }
+            System.out.println("\n");
+        }
+    }
+
     public static void main(String... strings) throws Exception {
-        hardwareEnumerator(Ocl.getInstance());
-        hardwareEnumerator(Cuda.getInstance());
+        runWrapper();
+//        hardwareEnumerator(Ocl.getInstance());
+//        hardwareEnumerator(Cuda.getInstance());
 
         // testVectorSync();
 
-        {
-
-            int split = 65536;
-
-            int mm = 32 * 32;
-
-            float x1[] = new float[mm];
-            float x2[] = new float[mm];
-            float o[]  = new float[mm];
-            for (int i = 0; i < mm; i++) {
-                x1[i] = (i + 1) * 0.5f;
-                x2[i] = (i + 1) * 1.5f;
-            }
-
-            // 50331648
-            // for (int i = 524288; i <= 524288; i += 524288) {
-
-            for (int ii = 524288; ii <= 50331648; ii += 524288) {
-                System.out.print("\nElapsed time " + ii + " iter: ");
-
-                for (int k = 0; k < 5; k++) {
-                    int _ii = (ii / split) / 8;
-
-                    long ctr = System.nanoTime();
-                    Common.queue(() -> {
-                        for (int l = 0; l < _ii; l++) {
-                            for (int i = 0; i < split; i++) {
-                                jvmLoop(x1, x2, o, 32);
-                            }
-                        }
-
-                        return null;
-                    });
-                    Common.await("JVM simulation", Integer.MAX_VALUE);
-
-                    ctr = System.nanoTime() - ctr;
-                    System.out.print(": " + (ctr / 1000000f));
-                }
-
-            }
-
-            System.out.println("");
-            for (float oo : o) {
-                // System.out.print(oo + ", ");
-            }
-        }
-
-        System.out.println("\n\n\n\n");
+//        {
+//
+//            int split = 65536;
+//
+//            int mm = 32 * 32;
+//
+//            float x1[] = new float[mm];
+//            float x2[] = new float[mm];
+//            float o[]  = new float[mm];
+//            for (int i = 0; i < mm; i++) {
+//                x1[i] = (i + 1) * 0.5f;
+//                x2[i] = (i + 1) * 1.5f;
+//            }
+//
+//            // 50331648
+//            // for (int i = 524288; i <= 524288; i += 524288) {
+//
+//            for (int ii = 524288; ii <= 50331648; ii += 524288) {
+//                System.out.print("\nElapsed time " + ii + " iter: ");
+//
+//                for (int k = 0; k < 5; k++) {
+//                    int _ii = (ii / split) / 8;
+//
+//                    long ctr = System.nanoTime();
+//                    Common.queue(() -> {
+//                        for (int l = 0; l < _ii; l++) {
+//                            for (int i = 0; i < split; i++) {
+//                                jvmLoop(x1, x2, o, 32);
+//                            }
+//                        }
+//
+//                        return null;
+//                    });
+//                    Common.await("JVM simulation", Integer.MAX_VALUE);
+//
+//                    ctr = System.nanoTime() - ctr;
+//                    System.out.print(": " + (ctr / 1000000f));
+//                }
+//
+//            }
+//
+//            System.out.println("");
+//            for (float oo : o) {
+//                // System.out.print(oo + ", ");
+//            }
+//        }
+//
+//        System.out.println("\n\n\n\n");
         // testList();
         // testVector();
 
-        {
-            long        cnt = (32 * 32) * 1;
-            FloatVector i1  = new FloatVector(cnt, true);
-            FloatVector i2  = new FloatVector(cnt, true);
-            FloatVector o   = new FloatVector(cnt, true);
-
-            for (long i = 0; i < cnt; i++) {
-                i1.set(i, (i + 1) * 0.5f);
-                i2.set(i, (i + 1) * 1.5f);
-            }
-
-            System.out.println("Multiplication 32x32 matrix ");
-            System.out.print("JVM   : ");
-            testMatrixDotProduct(Jvm.getInstance(), i1, i2, o);
-            System.out.print("\nvs\nCUDA  : ");
-            testMatrixDotProduct(Cuda.getInstance(), i1, i2, o);
-            System.out.print("\nvs\nOpenCL: ");
-            testMatrixDotProduct(Ocl.getInstance(), i1, i2, o);
-
-            i1.close();
-            i2.close();
-            o.close();
-        }
+//        {
+//            long        cnt = (32 * 32) * 1;
+//            FloatVector i1  = new FloatVector(cnt, true);
+//            FloatVector i2  = new FloatVector(cnt, true);
+//            FloatVector o   = new FloatVector(cnt, true);
+//
+//            for (long i = 0; i < cnt; i++) {
+//                i1.set(i, (i + 1) * 0.5f);
+//                i2.set(i, (i + 1) * 1.5f);
+//            }
+//
+//            for (int i = 0; i < cnt; i++) {
+//                System.out.print(o.get(i) + ", ");
+//            }
+//
+//            System.out.println("Multiplication 32x32 matrix ");
+//            System.out.print("\nvs\nCUDA  : ");
+//            testMatrixDotProduct(Cuda.getInstance(), i1, i2, o);
+//            System.out.print("\nvs\nOpenCL: ");
+//            testMatrixDotProduct(Ocl.getInstance(), i1, i2, o);
+//            System.out.print("JVM   : ");
+//            testMatrixDotProduct(Jvm.getInstance(), i1, i2, o);
+//            i1.close();
+//            i2.close();
+//            o.close();
+//        }
 
         System.out.println();
         System.out.println();

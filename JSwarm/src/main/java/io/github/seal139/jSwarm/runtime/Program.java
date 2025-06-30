@@ -1,6 +1,7 @@
 package io.github.seal139.jSwarm.runtime;
 
 import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 import org.apache.commons.math3.special.Erf;
 import org.apache.commons.math3.special.Gamma;
@@ -23,6 +24,8 @@ public abstract class Program {
 
     private long totalRangeX, totalRangeY, totalRangeZ;
 
+    private CyclicBarrier synchronizer;
+
     protected <T extends Number> void set(Vector<T> vec, long index, T value) {
         vec.set(index, value);
     }
@@ -30,6 +33,8 @@ public abstract class Program {
     protected <T extends Number> T get(Vector<T> vec, long index) {
         return vec.get(index);
     }
+
+    int count = 0;
 
     /**
      * Await all thread to complete execution at this point before continue <br/>
@@ -40,7 +45,11 @@ public abstract class Program {
      */
     @FunctionIntrinsic
     protected void synchronize() {
-        // NoOp
+        try {
+            this.synchronizer.await();
+        }
+        catch (InterruptedException | BrokenBarrierException e) {
+        }
     }
 
     /**
@@ -1571,4 +1580,6 @@ public abstract class Program {
         this.currentGlobalRangeZ = currentGlobalRangeZ;
         this.currentRangeZ       = currentRangeZ + this.currentLocalRangeZ;
     }
+
+    final void setSynchronizer(CyclicBarrier synchronizer) { this.synchronizer = synchronizer; }
 }

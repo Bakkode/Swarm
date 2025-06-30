@@ -330,7 +330,6 @@ public final class CudaTranspiler extends Transpiler {
         }
         catch (TranspileException e) {
             this.e = e;
-            e.printStackTrace();
         }
     }
 
